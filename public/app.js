@@ -14,7 +14,7 @@
     {c:'Situação de advertência do título no SAP', h:'A origem guarda o histórico dessa situação?', a:4, w:'Snapshot SCD2 com strategy check: a origem só mostra a situação atual, e ela define se o título é cobrável.'}
   ];
   const POLLS = {
-    aq1: {q:'Alguém já precisou explicar um número do passado e a tabela só tinha o presente?', o:['Sim, e descobri na reunião com o negócio','Sim, e reconstruí na mão a partir de logs','Fui eu que sobrescrevi o histórico','Nunca aconteceu comigo (ainda)']},
+    aq1: {q:'Alguém já precisou explicar um número do passado e a tabela só tinha o presente?', o:['Sim, e descobri na reunião com o negócio','Sim, reconstruí a partir de time travel Databricks (VERSION AS OF)','Fui eu que sobrescrevi o histórico','Nunca aconteceu comigo (ainda)']},
     tipo: {q:'Qual tipo de SCD responde “o que era verdade em D?”', o:['Tipo 1','Tipo 2','Tipo 3','Tipo 6'], c:1, w:'Tipo 2: nova linha por mudança, com vigência. O 6 também guarda o histórico, mas é o 2 com uma coluna de valor atual.'},
     fronteira: {q:'Uma venda em 2026-05-01 cai em qual versão do cliente C-200 (Bronze até 2026-05-01, Gold desde 2026-05-01)?', o:['Bronze','Gold','Nas duas','Depende'], c:1, w:'Gold, com a janela semiaberta [início, fim). Sem uma convenção única no time, a venda conta duas vezes ou some.'},
     regua: {q:'Se o Crédito mudar a régua default amanhã, a decisão de 15/09 muda?', o:['Sim','Não','Depende'], c:1, w:'Não. A decisão de 15/09 usa a versão vigente em 15/09. A mudança abre uma nova vigência e não reescreve o passado.'},
@@ -212,11 +212,10 @@
     slides.forEach((s,k)=>s.classList.toggle('active', k===cur));
     $('progress').style.width = ((cur+1)/slides.length*100)+'%';
     const eb = slides[cur].querySelector('.eyebrow');
-    $('hudLabel').textContent = `${cur+1} / ${slides.length}` + (eb ? ' · ' + eb.textContent : '');
     $('notes').innerHTML = '';
     const nb = el('b',null,'Notas da apresentadora'); $('notes').append(nb, document.createTextNode(slides[cur].dataset.notes || ''));
     if (push) { palco.slide = cur; pushPalco(); }
-    if (cur === 10) rgRender();
+    if (slides[cur].querySelector('#rgDate')) rgRender();
   }
 
   document.addEventListener('keydown', e=>{
@@ -259,6 +258,7 @@
   document.querySelectorAll('.ask').forEach(a=>a.addEventListener('click', e=>{ if (e.target.closest('.lp')) return; a.classList.toggle('open'); }));
   document.querySelectorAll('[data-show]').forEach(b=>b.addEventListener('click', ()=>{ $(b.dataset.show).classList.add('show'); b.hidden = true; }));
   document.querySelectorAll('[data-toggle]').forEach(c=>c.addEventListener('click', ()=>{ const r = c.querySelector('.reveal'); r.classList.toggle('show'); const h = c.querySelector('.reveal-hint'); if (h) h.hidden = r.classList.contains('show'); }));
+  document.querySelectorAll('.guess').forEach(g=>g.addEventListener('click', ()=>{ const on = !g.classList.contains('shown'); g.classList.toggle('shown', on); g.textContent = on ? g.dataset.answer : 'Como se escreve? ▸'; }));
   document.querySelectorAll('.flip').forEach(f=>f.addEventListener('click', ()=>f.classList.toggle('on')));
   document.querySelectorAll('tr.clickable').forEach(r=>r.addEventListener('click', ()=>r.classList.toggle('picked')));
   const checks = [...document.querySelectorAll('.check input')];

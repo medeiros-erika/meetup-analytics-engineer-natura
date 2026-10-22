@@ -10,10 +10,8 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..700&family=DM+Sans:wght@300..700&family=DM+Mono:wght@400;500&display=swap">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23164F3C'/%3E%3Ctext x='16' y='22' font-size='15' font-family='Georgia' font-weight='700' text-anchor='middle' fill='%23F2B58F'%3E2%3C/text%3E%3C/svg%3E">
 <style>
-  [hidden] { display: none !important; }
   img { max-width: 100%; }
-</style>
-<style>
+  [hidden] { display: none !important; }
   /* Layout: duas faces da mesma página. Plateia = coluna única no celular; palco = canvas 16:9 escalado. */
   :root {
     /* plateia (claro) */
@@ -38,6 +36,7 @@
     color-scheme: dark; }
 
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   body { margin: 0; font-family: var(--f-body); background: var(--a-bg); color: var(--a-fg); }
   body.is-palco { background: var(--stage-ground); overflow: hidden; height: 100%; }
   html:has(body.is-palco) { height: 100%; overflow: hidden; }
@@ -271,6 +270,28 @@
   #qrOverlay h2 { margin: 0 0 12px; font-family: var(--f-display); font-size: clamp(28px, 4vw, 52px); line-height: 1.1; }
   #qrOverlay p { margin: 0; font-size: 18px; color: #CDE3DA; line-height: 1.6; }
   #qrOverlay .mono { font-family: var(--f-mono); font-size: 15px; color: var(--peach); overflow-wrap: anywhere; }
+  .fgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .fcard { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; display: grid; grid-template-columns: 250px 1fr; gap: 20px; }
+  .ftext, .frec { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+  .ftext .bar { margin-bottom: 2px; }
+  .fcard h3, .dcard h3 { font-size: 23px !important; }
+  #stage .fdef { font-size: 15.5px; line-height: 1.42; color: var(--body); }
+  #stage .fgrain { font-size: 14.5px; color: var(--text); }
+  .guess { align-self: flex-start; margin-top: auto; font-size: 14px; font-weight: 700; padding: 6px 12px; border-radius: 999px; border: 1.5px dashed var(--orange); background: transparent; color: var(--orange-ink); }
+  .guess.shown { border-style: solid; border-color: var(--green-deep); background: var(--green-deep); color: #fff; }
+  #stage .rec-label { font-size: 11.5px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); }
+  #stage .rec-note { font-size: 14px; color: var(--muted); }
+  #stage table.rec { font-family: var(--f-mono); font-size: 13.5px; border: 1px solid var(--line); border-radius: 8px; background: #FFFFFF; }
+  #stage table.rec th { font-family: var(--f-mono); font-size: 12px; letter-spacing: .3px; text-transform: none; padding: 6px 9px; background: #E9EEEA; color: var(--green-dark); }
+  #stage table.rec td { padding: 6px 9px; white-space: nowrap; }
+  #stage table.rec td.rec-hl { background: var(--orange-light); color: var(--orange-ink); font-weight: 500; }
+  .dgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .dcard { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .dcard .ex { margin-top: 0 !important; font-size: 14.5px; line-height: 1.4; }
+  .dcard.dark-card { background: var(--green-dark); border-color: var(--green-dark); color: #F5F3EE; }
+  #stage .dcard.dark-card .fdef { color: #CDE3DA; }
+  .dcard.dark-card .ex { color: var(--peach); }
+  .dcard.dark-card table.rec { border-color: #2F7A5F; }
   #qa { position: fixed; top: 0; right: 0; bottom: 0; width: min(460px, 100vw); background: #F5F3EE; color: #1E293B; z-index: 30; display: flex; flex-direction: column; box-shadow: -20px 0 60px rgba(0,0,0,.35); padding: calc(18px + env(safe-area-inset-top, 0px)) max(18px, env(safe-area-inset-right, 0px)) calc(18px + env(safe-area-inset-bottom, 0px)) 18px; gap: 12px; }
   #qa header { display: flex; justify-content: space-between; align-items: center; }
   #qa h2 { margin: 0; font-family: var(--f-display); font-size: 24px; }
@@ -290,7 +311,6 @@
   .ainput { width: 100%; font: inherit; font-size: 16px; color: var(--a-fg); background: var(--a-bg); border: 1.5px solid var(--a-line); border-radius: 12px; padding: 12px; }
   .qr-box img { width: 100%; height: auto; display: block; }
 </style>
-
 </head>
 <body>
 <main class="aud" id="plateia">
@@ -366,7 +386,7 @@
 
 <!-- 1 · AQUECIMENTO -->
 <section class="slide dark" data-poll="aq1" data-notes="Quebra-gelo de 2 minutos. Os votos chegam dos celulares. Puxe a conversa pelos extremos: quem descobriu na reunião, quanto tempo levou para reconstruir? Quem sobrescreveu, o que teria evitado?">
-  <div class="head"><p class="eyebrow">Aquecimento · vote no celular</p><h2>Alguém já precisou explicar um número do passado <em>e a tabela só tinha o presente?</em></h2></div>
+  <div class="head"><p class="eyebrow">Aquecimento · vote no QR code / link do chat</p><h2>Alguém já precisou explicar um número do passado <em>e a tabela só tinha o presente?</em></h2></div>
   <div class="row" style="gap:40px">
     <div class="grow"><div class="lp" data-lp="aq1"></div></div>
     <div class="card" style="width:420px;display:flex;flex-direction:column;gap:12px">
@@ -380,7 +400,7 @@
 <!-- 2 · AGENDA -->
 <section class="slide" data-notes="Cinco blocos. Os fundamentos são rápidos. O peso está no mapa de decisão e no case. As perguntas que chegarem pelo celular ficam no painel (tecla P): reserve um momento no fim de cada bloco para as mais curtidas.">
   <div class="row" style="gap:64px;height:100%">
-    <div class="col" style="width:400px;gap:16px"><p class="eyebrow">Roteiro</p><h2>O que vamos ver</h2><p class="lead" style="font-size:19px">Do conceito ao sistema em produção, com o Bloqueio Global como fio condutor. Cada bloco termina com uma pergunta para a sala.</p></div>
+    <div class="col" style="width:400px;gap:16px"><p class="eyebrow">Roteiro</p><h2>O que vamos ver</h2></div>
     <div class="col grow" style="gap:0">
       <div class="row" style="padding:18px 0;border-top:1px solid var(--line)"><p class="serif" style="font-size:32px;font-weight:700;color:var(--orange-ink);width:64px">01</p><div><h3>Fundamentos</h3><p class="small" style="font-size:17px">A pergunta sobre o passado, tipos de fato e de dimensão, SCD de 0 a 6</p></div></div>
       <div class="row" style="padding:18px 0;border-top:1px solid var(--line)"><p class="serif" style="font-size:32px;font-weight:700;color:var(--orange-ink);width:64px">02</p><div><h3>Mapa de decisão</h3><p class="small" style="font-size:17px">Cinco perguntas, testadas ao vivo com casos do nosso dia a dia</p></div></div>
@@ -404,28 +424,147 @@
 </section>
 
 <!-- 4 · FATOS -->
-<section class="slide" data-notes="Peça para a sala chutar a estratégia de cada tipo antes de virar o cartão. Fatos raramente pedem SCD2: o histórico já está no grão.">
+<section class="slide" data-notes="Para cada cartão, peça para a sala chutar como a fato é escrita antes de clicar em “Como se escreve?”. Compare as tabelas de exemplo: no transacional cada linha é um evento; no snapshot periódico a mesma obrigação aparece todo dia, mesmo sem mudança; no acumulado a linha é atualizada a cada marco; no factless contar linhas é a métrica. Fatos raramente pedem SCD2: o histórico de uma fato já está no grão. Quem muda de significado são as dimensões. Os registros são ilustrativos." style="gap:24px">
   <div class="head"><p class="eyebrow">Fundamentos · Fatos</p><h2>Quatro tipos de fato. <em>Qual jeito de escrever cada um pede?</em></h2></div>
-  <div class="row">
-    <div class="flip"><div class="flip-inner"><div class="flip-face flip-front"><div class="bar" style="background:var(--muted)"></div><h3 class="serif" style="font-size:28px">Transacional</h3><p style="font-size:18px">Uma linha por evento, que não muda depois de acontecer.</p><p class="tap">Clique para virar</p></div><div class="flip-face flip-back"><p class="pill" style="background:var(--peach);color:var(--green-ink);align-self:flex-start">Append-only</p><p style="font-size:18px">No case: o motor grava uma linha a cada mudança de decisão.</p></div></div></div>
-    <div class="flip"><div class="flip-inner"><div class="flip-face flip-front"><div class="bar" style="background:var(--green-deep)"></div><h3 class="serif" style="font-size:28px">Snapshot periódico</h3><p style="font-size:18px">Uma foto de cada entidade por período.</p><p class="tap">Clique para virar</p></div><div class="flip-face flip-back"><p class="pill" style="background:var(--peach);color:var(--green-ink);align-self:flex-start">Insert por partição</p><p style="font-size:18px">No case: fact de obrigação consolidada, particionada por data de referência.</p></div></div></div>
-    <div class="flip"><div class="flip-inner"><div class="flip-face flip-front"><div class="bar" style="background:var(--orange)"></div><h3 class="serif" style="font-size:28px">Snapshot acumulado</h3><p style="font-size:18px">Uma linha por processo, atualizada a cada marco.</p><p class="tap">Clique para virar</p></div><div class="flip-face flip-back"><p class="pill" style="background:var(--peach);color:var(--green-ink);align-self:flex-start">Merge</p><p style="font-size:18px">Leitura possível: o ciclo da obrigação, do vencimento à baixa.</p></div></div></div>
-    <div class="flip"><div class="flip-inner"><div class="flip-face flip-front"><div class="bar" style="background:var(--plum)"></div><h3 class="serif" style="font-size:28px">Sem fato (factless)</h3><p style="font-size:18px">Registra que algo vale ou aconteceu, sem medida.</p><p class="tap">Clique para virar</p></div><div class="flip-face flip-back"><p class="pill" style="background:var(--peach);color:var(--green-ink);align-self:flex-start">Append ou merge</p><p style="font-size:18px">Exemplo: habilitação de um cliente a um produto de crédito.</p></div></div></div>
+  <div class="fgrid">
+    <div class="fcard">
+      <div class="ftext">
+        <div class="bar" style="background:var(--muted)"></div>
+        <h3 class="serif">Transacional</h3>
+        <p class="fdef">Registra um evento no momento em que ele acontece. Depois de gravada, a linha não muda.</p>
+        <p class="fgrain"><b>Grão:</b> um evento</p>
+        <button class="guess" type="button" data-answer="Append-only">Como se escreve? ▸</button>
+      </div>
+      <div class="frec">
+        <p class="rec-label">Exemplo · decisões do motor</p>
+        <table class="rec">
+          <tr><th>ts_decisao</th><th>cpf</th><th>token</th><th>status</th></tr>
+          <tr><td>05/09 10:00</td><td>***-12</td><td>002</td><td>BLOQUEADA</td></tr>
+          <tr><td>05/09 13:00</td><td>***-12</td><td>—</td><td>LIBERADA</td></tr>
+        </table>
+        <p class="rec-note">Uma linha nova por mudança de decisão.</p>
+      </div>
+    </div>
+    <div class="fcard">
+      <div class="ftext">
+        <div class="bar" style="background:var(--green-deep)"></div>
+        <h3 class="serif">Snapshot periódico</h3>
+        <p class="fdef">Tira uma foto de cada entidade a cada período, tendo mudado ou não.</p>
+        <p class="fgrain"><b>Grão:</b> entidade × data de referência</p>
+        <button class="guess" type="button" data-answer="Insert por partição">Como se escreve? ▸</button>
+      </div>
+      <div class="frec">
+        <p class="rec-label">Exemplo · fact de obrigação consolidada</p>
+        <table class="rec">
+          <tr><th>dt_ref</th><th>obrigação</th><th>status</th><th>vl_debito</th></tr>
+          <tr><td>01/09</td><td>T-881</td><td>A VENCER</td><td>480,00</td></tr>
+          <tr><td>02/09</td><td>T-881</td><td>VENCIDO</td><td>480,00</td></tr>
+          <tr><td>03/09</td><td>T-881</td><td>VENCIDO</td><td>480,00</td></tr>
+        </table>
+        <p class="rec-note">A mesma obrigação aparece todo dia.</p>
+      </div>
+    </div>
+    <div class="fcard">
+      <div class="ftext">
+        <div class="bar" style="background:var(--orange)"></div>
+        <h3 class="serif">Snapshot acumulado</h3>
+        <p class="fdef">Acompanha um processo com início e fim. Cada marco preenche uma coluna da mesma linha.</p>
+        <p class="fgrain"><b>Grão:</b> um processo</p>
+        <button class="guess" type="button" data-answer="Merge">Como se escreve? ▸</button>
+      </div>
+      <div class="frec">
+        <p class="rec-label">Exemplo · ciclo da obrigação</p>
+        <table class="rec">
+          <tr><th>obrigação</th><th>emissão</th><th>vencimento</th><th>baixa</th></tr>
+          <tr><td>T-881</td><td>10/08</td><td>01/09</td><td class="rec-hl">20/09</td></tr>
+          <tr><td>T-902</td><td>15/08</td><td>05/09</td><td>null</td></tr>
+        </table>
+        <p class="rec-note">A baixa de T-881 atualizou a linha que já existia.</p>
+      </div>
+    </div>
+    <div class="fcard">
+      <div class="ftext">
+        <div class="bar" style="background:var(--plum)"></div>
+        <h3 class="serif">Sem fato (factless)</h3>
+        <p class="fdef">Registra que uma relação existe ou que algo ocorreu, sem nenhuma medida numérica.</p>
+        <p class="fgrain"><b>Grão:</b> uma ocorrência ou cobertura</p>
+        <button class="guess" type="button" data-answer="Append ou merge">Como se escreve? ▸</button>
+      </div>
+      <div class="frec">
+        <p class="rec-label">Exemplo · fact_habilitacao_produto_credito</p>
+        <table class="rec">
+          <tr><th>cpf</th><th>produto</th><th>dt_habilitacao</th></tr>
+          <tr><td>***-12</td><td>PEP</td><td>01/03</td></tr>
+          <tr><td>***-12</td><td>ON_US</td><td>15/06</td></tr>
+        </table>
+        <p class="rec-note">Contar linhas é a métrica: quantos clientes por produto.</p>
+      </div>
+    </div>
   </div>
-  <p style="font-size:20px;color:var(--body)">Fatos raramente pedem SCD2: o histórico de uma fato já está no grão. Quem muda de significado são as dimensões.</p>
   <div class="ask"><div class="ask-ico">?</div><div><p class="ask-label">Pergunta para a sala</p><p class="ask-hint">Clique ou tecle Q</p><p class="ask-q">Alguém já viu SCD2 aplicado numa fato? Qual problema ele estava tentando resolver?</p></div></div>
 </section>
 
 <!-- 5 · DIMENSÕES -->
-<section class="slide" data-notes="Todos os exemplos vêm do Bloqueio Global. O catálogo de motivos é um seed versionado: mudar o significado gera nova sk.">
+<section class="slide" data-notes="Todos os exemplos vêm do Bloqueio Global e são ilustrativos. Conformada: a mesma sk_cliente liga obrigação, decisão e habilitação. Role-playing: uma tabela de calendário, três chaves na fato. Junk: em vez de cinco flags na fato, uma sk para a combinação. Degenerada: o número do título não tem atributos próprios. Catálogo: seed versionado por PR, e mudar a descrição gera nova sk. Versionada: a régua com vigência, tema do resto do encontro." style="gap:24px">
   <div class="head"><p class="eyebrow">Fundamentos · Dimensões</p><h2>Seis tipos de dimensão que usamos no dia a dia</h2></div>
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
-    <div class="card"><h3 class="serif" style="font-size:24px">Conformada</h3><p style="font-size:17px">Mesmo significado em todos os fatos e domínios.</p><p class="ex">Cliente por CPF, calendário.</p></div>
-    <div class="card"><h3 class="serif" style="font-size:24px">Role-playing</h3><p style="font-size:17px">A mesma dimensão em papéis diferentes.</p><p class="ex">Calendário como vencimento, baixa e referência.</p></div>
-    <div class="card"><h3 class="serif" style="font-size:24px">Junk</h3><p style="font-size:17px">Agrupa flags e atributos de baixa cardinalidade.</p><p class="ex">Dimensão de detalhe da fact de obrigação.</p></div>
-    <div class="card"><h3 class="serif" style="font-size:24px">Degenerada</h3><p style="font-size:17px">Uma chave que vive na fato, sem tabela própria.</p><p class="ex">Número do título ou da parcela.</p></div>
-    <div class="card"><h3 class="serif" style="font-size:24px">Catálogo versionado</h3><p style="font-size:17px">Domínio fechado, alterado só por pull request.</p><p class="ex">13 motivos de bloqueio; novo significado, nova sk.</p></div>
-    <div class="card" style="background:var(--green-dark);border-color:var(--green-dark);color:#F5F3EE"><h3 class="serif" style="font-size:24px">Versionada (SCD)</h3><p style="font-size:17px">Atributos mudam e o histórico importa.</p><p class="ex" style="color:var(--peach)">Régua específica e default de bloqueio.</p></div>
+  <div class="dgrid">
+    <div class="dcard">
+      <h3 class="serif">Conformada</h3>
+      <p class="fdef">Tem o mesmo significado e a mesma chave em todas as fatos e domínios.</p>
+      <table class="rec">
+        <tr><th>sk_cliente</th><th>nk_documento</th><th>tp_pessoa</th></tr>
+        <tr><td>4711</td><td>***-12</td><td>PF</td></tr>
+      </table>
+      <p class="ex">dim_cliente: a mesma sk liga obrigação, decisão e habilitação.</p>
+    </div>
+    <div class="dcard">
+      <h3 class="serif">Role-playing</h3>
+      <p class="fdef">Uma única dimensão usada em vários papéis na mesma fato.</p>
+      <table class="rec">
+        <tr><th>fk_dt_venc</th><th>fk_dt_baixa</th><th>fk_dt_ref</th></tr>
+        <tr><td>20260901</td><td>20260920</td><td>20260915</td></tr>
+      </table>
+      <p class="ex">Três chaves na fato apontam para o mesmo calendário.</p>
+    </div>
+    <div class="dcard">
+      <h3 class="serif">Junk</h3>
+      <p class="fdef">Junta flags e códigos de baixa cardinalidade numa dimensão só.</p>
+      <table class="rec">
+        <tr><th>sk_detalhe</th><th>cobrável</th><th>advertência</th></tr>
+        <tr><td>1</td><td>true</td><td>—</td></tr>
+        <tr><td>2</td><td>false</td><td>contestação</td></tr>
+      </table>
+      <p class="ex">A fato guarda uma sk para a combinação, não cinco flags.</p>
+    </div>
+    <div class="dcard">
+      <h3 class="serif">Degenerada</h3>
+      <p class="fdef">Uma chave de negócio que fica na fato, sem tabela de dimensão própria.</p>
+      <table class="rec">
+        <tr><th>sk_cliente</th><th>nr_titulo</th><th>vl_debito</th></tr>
+        <tr><td>4711</td><td class="rec-hl">1800042</td><td>480,00</td></tr>
+      </table>
+      <p class="ex">O número do título não tem atributos: mora na fato.</p>
+    </div>
+    <div class="dcard">
+      <h3 class="serif">Catálogo versionado</h3>
+      <p class="fdef">Domínio fechado, mantido como seed e alterado só por pull request.</p>
+      <table class="rec">
+        <tr><th>nk_motivo</th><th>dc_motivo</th><th>tp_bloqueio</th></tr>
+        <tr><td>002</td><td>Global Cosméticos</td><td>GLOBAL</td></tr>
+        <tr><td>099</td><td>Bloqueio manual</td><td>MANUAL</td></tr>
+      </table>
+      <p class="ex">13 motivos de bloqueio; mudar a descrição gera nova sk.</p>
+    </div>
+    <div class="dcard dark-card">
+      <h3 class="serif">Versionada (SCD)</h3>
+      <p class="fdef">Os atributos mudam com o tempo e o histórico precisa ser consultável.</p>
+      <table class="rec">
+        <tr><th>versão</th><th>regra</th><th>vigência</th></tr>
+        <tr><td>v1</td><td>5d · R$ 150</td><td>01/07 → 01/08</td></tr>
+        <tr><td>v2</td><td>3d · R$ 100</td><td>01/08 → 01/10</td></tr>
+      </table>
+      <p class="ex">Régua default do Pag Emana Pay, com vigência.</p>
+    </div>
   </div>
   <div class="ask"><div class="ask-ico">?</div><div><p class="ask-label">Pergunta para a sala</p><p class="ask-hint">Clique ou tecle Q</p><p class="ask-q">Qual dimensão do seu domínio muda de significado e hoje é sobrescrita?</p></div></div>
 </section>
@@ -696,7 +835,7 @@ check_cols = [colunas versionadas]
 </div></div>
 
 <div id="hud">
-  <span><span id="hudLive"><i></i><span id="hudLiveTxt">offline</span></span> · <span id="hudLabel"></span></span>
+  <span><span id="hudLive"><i></i><span id="hudLiveTxt">offline</span></span></span>
   <div class="nav">
     <button id="bQr">QR code (C)</button>
     <button id="bQa">Perguntas (P) <span id="hudQ"></span></button>
