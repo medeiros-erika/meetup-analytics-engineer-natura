@@ -4,14 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Meetup SCD Tipo 2</title>
-<meta name="description" content="Meetup Analytics Engineering · SCD Tipo 2 — votações e perguntas ao vivo">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..700&family=DM+Sans:wght@300..700&family=DM+Mono:wght@400;500&display=swap">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23164F3C'/%3E%3Ctext x='16' y='22' font-size='15' font-family='Georgia' font-weight='700' text-anchor='middle' fill='%23F2B58F'%3E2%3C/text%3E%3C/svg%3E">
 <style>
-  img { max-width: 100%; }
-  [hidden] { display: none !important; }
   /* Layout: duas faces da mesma página. Plateia = coluna única no celular; palco = canvas 16:9 escalado. */
   :root {
     /* plateia (claro) */
@@ -264,7 +258,12 @@
 
   /* painel de perguntas (palco) */
   .qr-box { background: #FFFFFF; border-radius: 14px; padding: 12px; line-height: 0; }
-  .qr-box svg { width: 100%; height: auto; display: block; }
+  .qr-box svg, .qr-box img { width: 100%; height: auto; display: block; }
+  .aud input[type=text], #login input { width: 100%; font: inherit; font-size: 16px; color: var(--a-fg); background: var(--a-bg); border: 1.5px solid var(--a-line); border-radius: 12px; padding: 11px 12px; }
+  .aud-toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); max-width: min(520px, calc(100vw - 32px)); background: var(--a-fg); color: var(--a-bg); padding: 12px 16px; border-radius: 12px; font-size: 14px; z-index: 50; margin: 0; }
+  #login { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--a-bg); z-index: 60; }
+  #login form { width: min(380px, 100%); display: flex; flex-direction: column; gap: 14px; background: var(--a-surface); border: 1px solid var(--a-line); border-radius: 16px; padding: 24px; }
+  #login h1 { margin: 0; font-family: var(--f-display); font-size: 26px; }
   #qrOverlay { position: fixed; inset: 0; z-index: 40; background: rgba(12,31,24,.94); display: flex; align-items: center; justify-content: center; gap: 56px; flex-wrap: wrap; padding: 32px; color: #F5F3EE; cursor: pointer; }
   #qrOverlay .qr-box { width: min(520px, 70vh, 80vw); padding: 22px; }
   #qrOverlay h2 { margin: 0 0 12px; font-family: var(--f-display); font-size: clamp(28px, 4vw, 52px); line-height: 1.1; }
@@ -308,11 +307,11 @@
   #qa .qa-item button { justify-self: start; border: 0; background: none; color: #1B6B50; font-size: 12px; font-weight: 700; text-decoration: underline; padding: 0; }
   #qa .qa-empty { color: #5A6472; font-size: 14px; text-align: center; padding: 30px 10px; border: 1.5px dashed #DED8CB; border-radius: 12px; }
   #qa .x { border: 0; background: none; font-size: 24px; color: #5A6472; }
-  .ainput { width: 100%; font: inherit; font-size: 16px; color: var(--a-fg); background: var(--a-bg); border: 1.5px solid var(--a-line); border-radius: 12px; padding: 12px; }
-  .qr-box img { width: 100%; height: auto; display: block; }
 </style>
+
 </head>
 <body>
+<!-- ═════════ PLATEIA (celular) ═════════ -->
 <main class="aud" id="plateia">
   <header class="aud-top">
     <p class="aud-brand">Meetup AE · SCD Tipo 2</p>
@@ -335,8 +334,8 @@
   <section id="vPerg" class="col" style="gap:14px" hidden>
     <form id="qForm" class="acard">
       <label for="qText" class="q">Mande sua pergunta para a Erika</label>
+      <input type="text" id="qNome" maxlength="60" placeholder="Seu nome (opcional)" autocomplete="name">
       <textarea id="qText" maxlength="280" placeholder="Ex.: Quando snapshot fica caro demais, quando vale migrar para Merge + SCD2?"></textarea>
-      <input id="qName" class="ainput" maxlength="60" autocomplete="name" placeholder="Seu nome (opcional)" aria-label="Seu nome">
       <div class="arow">
         <label class="achk"><input type="checkbox" id="qAnon"> Não mostrar meu nome</label>
         <button class="abtn" id="qSend" type="submit">Enviar</button>
@@ -346,20 +345,7 @@
     <p class="aud-note">Curta as perguntas que você também quer ver respondidas. As mais curtidas sobem.</p>
     <div class="qlist" id="qList"><p class="empty">Nenhuma pergunta ainda. Seja a primeira pessoa a perguntar.</p></div>
   </section>
-  <p class="aud-note" id="audEditor" hidden>Você está como apresentadora. <button class="linklike" id="goPalco">Abrir modo apresentadora</button></p>
-</main>
-
-<!-- ═════════ LOGIN DA APRESENTADORA ═════════ -->
-<main class="aud" id="login" hidden>
-  <p class="aud-brand">Meetup AE · SCD Tipo 2</p>
-  <form id="loginForm" class="acard">
-    <p class="aud-eyebrow">Modo apresentadora</p>
-    <label for="loginPw" class="q">Senha</label>
-    <input type="password" id="loginPw" class="ainput" autocomplete="current-password" required>
-    <button class="abtn" type="submit">Entrar</button>
-    <p class="aud-err" id="loginErr" hidden></p>
-  </form>
-  <p class="aud-note">É da plateia? <a class="linklike" href="/">Entre por aqui</a>.</p>
+  <p class="aud-toast" id="audMsg" role="status" hidden></p>
 </main>
 
 <!-- ═════════ PALCO ═════════ -->
@@ -378,7 +364,7 @@
   </div>
   <div class="card" style="position:absolute;right:104px;top:130px;width:440px;display:flex;flex-direction:column;gap:12px;background:var(--green-ink)">
     <p class="phone-tag" style="align-self:flex-start">📱 Aponte a câmera</p>
-    <div class="qr-box" data-qr style="width:240px;align-self:center"></div>
+    <div class="qr-box" style="width:240px;align-self:center"><img src="/qr.svg" alt="QR code do link do meetup"></div>
     <p style="font-size:19px">Você vota nas perguntas e manda dúvidas por lá, ao vivo.</p>
     <p class="mono small" id="capaStats">0 pessoas conectadas</p>
   </div>
@@ -841,16 +827,16 @@ check_cols = [colunas versionadas]
     <button id="bQa">Perguntas (P) <span id="hudQ"></span></button>
     <button id="bNotes">Notas (N)</button>
     <button id="bAud">Ver como plateia</button>
-    <button id="bExport" title="Baixar votos e perguntas em JSON">Exportar</button>
+    <button id="bExport">Exportar</button>
     <button id="bHelp">?</button>
     <button id="bPrev" aria-label="Slide anterior">◂</button>
     <button id="bNext" aria-label="Próximo slide">▸</button>
   </div>
 </div>
 <div id="notes" hidden></div>
-<div id="help" hidden><b>Atalhos</b><br><kbd>→</kbd> <kbd>espaço</kbd> próximo · <kbd>←</kbd> anterior<br><kbd>Q</kbd> pergunta para a sala · <kbd>P</kbd> painel de perguntas<br><kbd>C</kbd> QR code · <kbd>N</kbd> notas · <kbd>F</kbd> tela cheia</div>
+<div id="help" hidden><b>Atalhos</b><br><kbd>→</kbd> <kbd>espaço</kbd> próximo · <kbd>←</kbd> anterior<br><kbd>Q</kbd> pergunta para a sala · <kbd>P</kbd> painel de perguntas<br><kbd>C</kbd> QR code · <kbd>N</kbd> notas · <b>Exportar</b> baixa votos e perguntas · <kbd>F</kbd> tela cheia</div>
 <div id="qrOverlay" hidden role="dialog" aria-label="QR code do meetup">
-  <div class="qr-box" data-qr></div>
+  <div class="qr-box"><img src="/qr.svg" alt="QR code do link do meetup"></div>
   <div style="max-width:440px">
     <h2>Entre pelo celular</h2>
     <p>Aponte a câmera para o código. Você vota nas perguntas e manda dúvidas ao vivo.</p>
@@ -865,6 +851,16 @@ check_cols = [colunas versionadas]
 </aside>
 </div>
 
-<script src="/app.js"></script>
+<div id="login" hidden>
+  <form id="loginForm">
+    <h1>Modo apresentadora</h1>
+    <label for="loginSenha" class="aud-note">Senha</label>
+    <input id="loginSenha" type="password" autocomplete="current-password" required>
+    <button class="abtn" id="loginBtn" type="submit">Entrar</button>
+    <p class="aud-err" id="loginErr" hidden></p>
+  </form>
+</div>
+
+<script src="/app.js" defer></script>
 </body>
 </html>

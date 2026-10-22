@@ -2,8 +2,13 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const slides = [...document.querySelectorAll('.slide')];
+  const store = {
+    get(k){ try { return localStorage.getItem(k); } catch(e){ return null; } },
+    set(k,v){ try { localStorage.setItem(k,v); } catch(e){} },
+    del(k){ try { localStorage.removeItem(k); } catch(e){} }
+  };
 
-  /* ─── Votações ─── */
+  /* ─── Votações (ids e nº de opções iguais aos do server.js) ─── */
   const OPTS = ['Append-only','Merge','Não versionar','Merge + SCD2','Snapshot SCD2'];
   const DN = [
     {c:'Pagamentos de fatura recebidos da Dock', h:'O pagamento muda depois de recebido?', a:0, w:'Append-only: é evento imutável. Cada pagamento é um fato que aconteceu e não se altera.'},
@@ -23,61 +28,55 @@
   DN.forEach((x,i)=>{ POLLS['dn'+i] = {q:x.c, h:x.h, o:OPTS, c:x.a, w:x.w}; });
 
   /* ─── Estado ─── */
-  let live = false, editor = false, mode = 'plateia';
+  const IS_PALCO = location.pathname.replace(/\/+$/,'') === '/palco';
+  let S = {palco:{slide:0,dn:0,rev:{}}, tallies:{}, perguntas:[], votantes:0, conectados:0};
+  let live = false, editor = false, mode = IS_PALCO ? 'palco' : 'plateia', palcoSynced = false;
   let palco = {slide:0, dn:0, rev:{}};
-  let pub = {tallies:{}, perguntas:[], votantes:0, conectados:0};
-  let mine = {votos:{}, curtidas:{}}, myQIds = new Set();
-  let me = {id:null, token:null};
-  let adminToken = null;
+  let me = {pid: store.get('meetup_pid'), token: store.get('meetup_ptoken'), nome: store.get('meetup_nome') || '', votos:{}, curtidas:new Set(), perguntas:new Set()};
+  let adminToken = store.get('meetup_admin');
   const manual = {};
-  let palcoSynced = false;
-
-  const store = {
-    get(k){ try { return JSON.parse(localStorage.getItem(k)); } catch(_) { return null; } },
-    set(k,v){ try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch(_){} }
-  };
-
-  async function api(method, url, body, asAdmin){
-    const h = {'Content-Type':'application/json'};
-    if (me.id) { h['x-pid'] = me.id; h['x-ptoken'] = me.token; }
-    if (asAdmin && adminToken) h['x-admin'] = adminToken;
-    const r = await fetch(url, {method, headers:h, body: body === undefined ? undefined : JSON.stringify(body)});
-    let data = null; try { data = await r.json(); } catch(_){}
-    if (!r.ok) { const e = new Error((data && data.erro) || r.statusText); e.status = r.status; e.code = data && data.erro; throw e; }
-    return data;
-  }
-
-  const clone = o => JSON.parse(JSON.stringify(o || {}));
   const isObj = o => o && typeof o === 'object' && !Array.isArray(o);
 
+  async function api(method, url, body, asAdmin){
+    const h = {};
+    if (body !== undefined) h['Content-Type'] = 'application/json';
+    if (me.pid && me.token) { h['x-pid'] = me.pid; h['x-ptoken'] = me.token; }
+    if (asAdmin && adminToken) h['x-admin'] = adminToken;
+    const r = await fetch(url, {method, headers:h, body: body !== undefined ? JSON.stringify(body) : undefined});
+    let j = null; try { j = await r.json(); } catch(e){}
+    if (!r.ok) { const e = new Error((j && j.erro) || ('http_' + r.status)); e.status = r.status; e.code = j && j.erro; throw e; }
+    return j;
+  }
+
   function tally(pid){
-    const n = POLLS[pid].o.length, c = Array(n).fill(0);
-    if (live) { const t = pub.tallies && pub.tallies[pid]; if (Array.isArray(t)) t.forEach((k,i)=>{ if (i<n) c[i] = k|0; }); }
-    else if (manual[pid]) manual[pid].forEach((k,i)=>c[i]=k);
-    return c;
+    const n = POLLS[pid].o.length;
+    if (live) { const t = S.tallies && S.tallies[pid]; return Array.from({length:n}, (_,i)=> (t && Number(t[i])) || 0); }
+    const c = Array(n).fill(0); if (manual[pid]) manual[pid].forEach((k,i)=>c[i]=k); return c;
   }
   function questions(){
-    return (pub.perguntas || []).map(q=>({key:q.id, id:q.id, texto:String(q.texto||'').slice(0,280), anon:q.anon===true, ts:Number(q.ts)||0, tipo:q.tipo==='rodada'?'rodada':'pergunta', likes:q.likes|0, done:q.done===true, nome:q.nome||'', mine:myQIds.has(q.id)}));
+    return (S.perguntas || []).filter(isObj).map(q=>({
+      key: String(q.id), id: String(q.id), texto: String(q.texto || '').slice(0,280), anon: q.anon === true,
+      ts: Number(q.ts) || 0, tipo: q.tipo === 'rodada' ? 'rodada' : 'pergunta', likes: Number(q.likes) || 0,
+      done: q.done === true, nome: typeof q.nome === 'string' ? q.nome : '', mine: me.perguntas.has(String(q.id))
+    }));
   }
   const revealed = pid => !!(palco.rev && palco.rev[pid]);
   function currentPoll(i){
     const p = slides[i] && slides[i].dataset.poll;
     if (!p) return null;
-    return p === 'dn' ? 'dn' + (Number.isInteger(palco.dn) ? Math.max(0, Math.min(DN.length-1, palco.dn)) : 0) : p;
+    return p === 'dn' ? 'dn' + Math.max(0, Math.min(DN.length-1, palco.dn|0)) : p;
   }
+  function el(tag, cls, text){ const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 
   /* ═════════ PLATEIA ═════════ */
-  let audTab = 'agora';
   function setTab(t){
-    audTab = t;
     $('tabAgora').classList.toggle('on', t==='agora'); $('tabAgora').setAttribute('aria-selected', t==='agora');
     $('tabPerg').classList.toggle('on', t==='perg'); $('tabPerg').setAttribute('aria-selected', t==='perg');
     $('vAgora').hidden = t!=='agora'; $('vPerg').hidden = t!=='perg';
   }
   $('tabAgora').onclick = ()=>setTab('agora');
   $('tabPerg').onclick = ()=>setTab('perg');
-
-  function el(tag, cls, text){ const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  $('qNome').value = me.nome;
 
   function renderAudience(){
     const i = Math.max(0, Math.min(slides.length-1, palco.slide|0));
@@ -87,8 +86,9 @@
     $('audTitle').textContent = h ? h.textContent : '';
     const card = $('audCard'); card.replaceChildren();
     const pid = currentPoll(i);
+    const ready = live && !!me.pid;
     if (pid) {
-      const P = POLLS[pid], my = mine.votos[pid], rev = revealed(pid), showBars = rev || P.c === undefined;
+      const P = POLLS[pid], my = me.votos[pid], rev = revealed(pid), showBars = rev || P.c === undefined;
       const c = tally(pid), tot = c.reduce((a,b)=>a+b,0);
       if (pid.startsWith('dn')) card.append(el('p','aud-eyebrow',`Dinâmica · caso ${+pid.slice(2)+1} de ${DN.length}`));
       card.append(el('p','q',P.q));
@@ -100,18 +100,18 @@
         const f = el('span','fill'); if (showBars && tot) f.style.width = (c[k]/tot*100)+'%';
         b.append(f, el('span',null,o + (my===k ? ' · seu voto' : '')));
         if (showBars) b.append(el('b',null,String(c[k])));
-        b.disabled = !live || !me.id || rev;
+        b.disabled = !ready || rev;
         b.onclick = ()=>vote(pid,k);
         card.append(b);
       });
       if (rev && P.w) card.append(el('p','ans',P.w));
-      else card.append(el('p','hint', !live ? 'Sem conexão: seu voto não pode ser enviado agora.' : (my === undefined ? 'Toque numa opção para votar. Dá para trocar até a resposta ser revelada.' : (P.c === undefined ? 'Voto registrado. Os resultados aparecem ao vivo.' : 'Voto registrado. A resposta aparece aqui quando a Erika revelar.'))));
+      else card.append(el('p','hint', !ready ? 'Conectando… seu voto poderá ser enviado em instantes.' : (my === undefined ? 'Toque numa opção para votar. Dá para trocar até a resposta ser revelada.' : (P.c === undefined ? 'Voto registrado. Os resultados aparecem ao vivo.' : 'Voto registrado. A resposta aparece aqui quando a Erika revelar.'))));
     } else if (i === slides.length-1) {
       card.append(el('p','aud-eyebrow','Rodada final'));
       card.append(el('p','q','Qual tabela do seu domínio deveria ser SCD2 e hoje não é, ou o contrário?'));
       const ta = el('textarea'); ta.id = 'rodadaText'; ta.maxLength = 280; ta.placeholder = 'Uma frase basta.';
       const row = el('div','arow'); const lab = el('label','achk'); const cb = el('input'); cb.type='checkbox'; cb.id='rodadaAnon'; lab.append(cb, document.createTextNode(' Não mostrar meu nome'));
-      const send = el('button','abtn','Enviar'); send.type='button'; send.disabled = !live || !me.id;
+      const send = el('button','abtn','Enviar'); send.type='button'; send.disabled = !ready;
       send.onclick = async ()=>{ const t = ta.value.trim(); if (!t) return; send.disabled = true; const ok = await addQuestion(t, cb.checked, 'rodada'); if (ok) { ta.value=''; send.textContent='Enviado'; setTimeout(()=>{ send.textContent='Enviar'; send.disabled=false; }, 1500); } else send.disabled=false; };
       row.append(lab, send); card.append(ta, row);
       const mineR = questions().filter(q=>q.mine && q.tipo==='rodada');
@@ -123,7 +123,7 @@
         card.append(el('p','q',ask.textContent));
         card.append(el('p','hint','Responda em voz alta ou mande por escrito: a resposta entra no painel da Erika.'));
         const b = el('button','abtn ghost','Responder por escrito'); b.type='button';
-        b.onclick = ()=>{ setTab('perg'); $('qText').value = ''; $('qText').placeholder = 'Sobre: ' + ask.textContent; $('qText').focus(); };
+        b.onclick = ()=>{ setTab('perg'); $('qText').placeholder = 'Sobre: ' + ask.textContent; $('qText').focus(); };
         card.append(b);
       } else {
         card.append(el('p','q','Acompanhe na tela.'));
@@ -138,13 +138,15 @@
     $('qCount').textContent = qs.length ? `(${qs.length})` : '';
     const list = $('qList'); list.replaceChildren();
     if (!qs.length) { list.append(el('p','empty','Nenhuma pergunta ainda. Seja a primeira pessoa a perguntar.')); return; }
+    const ready = live && !!me.pid;
     qs.forEach(q=>{
       const item = el('div','qitem' + (q.done?' done':''));
       item.append(el('p','qt',q.texto));
-      const who = q.mine ? 'Você' + (q.anon?' (sem nome na tela)':'') : (q.anon ? 'Sem nome' : (q.nome || 'Alguém'));
+      const who = q.mine ? 'Você' + (q.anon ? ' (sem nome na tela)' : '') : (q.anon ? 'Sem nome' : (q.nome || 'Alguém'));
       item.append(el('p','qm', who + (q.done ? ' · respondida' : '')));
-      const lk = el('button','like' + (mine.curtidas[q.key]?' on':''), '♥ ' + q.likes); lk.type='button'; lk.setAttribute('aria-label', 'Curtir pergunta, ' + q.likes + ' curtidas');
-      lk.disabled = !live || !me.id; lk.onclick = ()=>toggleLike(q.key);
+      const liked = me.curtidas.has(q.id);
+      const lk = el('button','like' + (liked?' on':''), '♥ ' + q.likes); lk.type='button'; lk.setAttribute('aria-label', 'Curtir pergunta, ' + q.likes + ' curtidas');
+      lk.disabled = !ready; lk.onclick = ()=>toggleLike(q.id);
       item.append(lk);
       if (q.mine) { const d = el('button','qdel','Apagar'); d.type='button'; d.onclick = ()=>delQuestion(q.id); item.append(d); }
       list.append(item);
@@ -159,40 +161,57 @@
     $('qSend').disabled = false;
     if (ok) $('qText').value = '';
   });
+  $('qNome').addEventListener('change', ()=>{ me.nome = $('qNome').value.trim().slice(0,60); store.set('meetup_nome', me.nome); });
 
   function showErr(msg){ const e = $('qErr'); e.textContent = msg; e.hidden = !msg; }
   function errMsg(e){
     const c = e && e.code;
-    if (c === 'limite_perguntas') return 'Você chegou ao limite de 30 envios.';
-    if (c === 'enquete_revelada') return 'A resposta já foi revelada: a votação fechou.';
-    if (e && e.status === 429) return 'Muitos envios seguidos. Espere alguns segundos e tente de novo.';
+    if (c === 'muitos_envios') return 'Muitos envios seguidos. Espere alguns segundos e tente de novo.';
+    if (c === 'limite_perguntas') return 'Você chegou ao limite de 30 perguntas.';
+    if (c === 'enquete_revelada') return 'A resposta já foi revelada: a votação desta pergunta fechou.';
+    if (c === 'sessao_invalida') return 'Sua sessão expirou. Recarregue a página.';
     return 'Não foi possível enviar agora. Tente de novo em instantes.';
   }
-  async function failed(e){
-    if (e && e.status === 401) { await register(); }
-    showErr(errMsg(e)); if (mode === 'plateia') setTab(audTab);
-    await loadMine(); renderAll();
-  }
   async function vote(pid, k){
-    if (!live || !me.id || revealed(pid)) return;
-    mine.votos[pid] = k; renderAll();
-    try { await api('PUT', '/api/votos/' + pid, {opcao:k}); showErr(''); } catch(e){ failed(e); }
+    if (!me.pid || revealed(pid)) return;
+    const prev = me.votos[pid]; me.votos[pid] = k; renderAll();
+    try { await api('PUT', '/api/votos/' + encodeURIComponent(pid), {opcao:k}); showErr(''); }
+    catch(e){ if (prev === undefined) delete me.votos[pid]; else me.votos[pid] = prev; renderAll(); alertAud(errMsg(e)); }
   }
-  async function toggleLike(key){
-    if (!live || !me.id) return;
-    if (mine.curtidas[key]) delete mine.curtidas[key]; else mine.curtidas[key] = true; renderAll();
-    try { const r = await api('POST', '/api/curtidas/' + encodeURIComponent(key)); if (r.curtiu) mine.curtidas[key] = true; else delete mine.curtidas[key]; showErr(''); }
-    catch(e){ failed(e); }
+  async function toggleLike(id){
+    if (!me.pid) return;
+    try { const r = await api('POST', '/api/curtidas/' + encodeURIComponent(id)); if (r && r.curtiu) me.curtidas.add(id); else me.curtidas.delete(id); renderAll(); showErr(''); }
+    catch(e){ showErr(errMsg(e)); }
   }
   async function addQuestion(texto, anon, tipo){
-    if (!live || !me.id) { showErr('Sem conexão: não foi possível enviar.'); return false; }
-    const nome = ($('qName').value || '').trim();
-    store.set('meetup.nome', nome);
-    try { const r = await api('POST', '/api/perguntas', {texto: texto.slice(0,280), anon: !!anon, tipo, nome}); myQIds.add(r.id); showErr(''); renderAll(); return true; }
-    catch(e){ failed(e); return false; }
+    if (!me.pid) { showErr('Conectando… tente de novo em instantes.'); return false; }
+    me.nome = $('qNome').value.trim().slice(0,60); store.set('meetup_nome', me.nome);
+    try { const r = await api('POST', '/api/perguntas', {texto: texto.slice(0,280), anon: !!anon, tipo, nome: me.nome}); if (r && r.id) me.perguntas.add(String(r.id)); showErr(''); renderAll(); return true; }
+    catch(e){ showErr(errMsg(e)); alertAud(errMsg(e)); return false; }
   }
   async function delQuestion(id){
-    try { await api('DELETE', '/api/perguntas/' + encodeURIComponent(id)); myQIds.delete(id); renderAll(); } catch(e){ failed(e); }
+    try { await api('DELETE', '/api/perguntas/' + encodeURIComponent(id)); me.perguntas.delete(id); renderAll(); } catch(e){ showErr(errMsg(e)); }
+  }
+  let audMsgT = null;
+  function alertAud(msg){ const n = $('audMsg'); n.textContent = msg; n.hidden = false; clearTimeout(audMsgT); audMsgT = setTimeout(()=>{ n.hidden = true; }, 4000); }
+
+  async function initParticipante(){
+    if (me.pid && me.token) {
+      try {
+        const r = await api('GET', '/api/eu');
+        me.votos = isObj(r.votos) ? r.votos : {};
+        me.curtidas = new Set((r.curtidas || []).map(String));
+        me.perguntas = new Set((r.perguntas || []).map(String));
+        if (!me.nome && r.nome) { me.nome = r.nome; $('qNome').value = r.nome; }
+        renderAll(); return;
+      } catch(e) { if (e.status !== 401) { setTimeout(initParticipante, 4000); return; } }
+    }
+    try {
+      const r = await api('POST', '/api/participantes');
+      me.pid = r.id; me.token = r.token; store.set('meetup_pid', r.id); store.set('meetup_ptoken', r.token);
+      me.votos = {}; me.curtidas = new Set(); me.perguntas = new Set();
+      renderAll();
+    } catch(e) { me.pid = null; setTimeout(initParticipante, 4000); }
   }
 
   /* ═════════ PALCO ═════════ */
@@ -203,25 +222,25 @@
 
   let palcoTimer = null;
   function pushPalco(){
-    if (!live || !editor || mode !== 'palco') return;
+    if (!editor || mode !== 'palco') return;
     clearTimeout(palcoTimer);
-    palcoTimer = setTimeout(()=>{ api('PUT', '/api/admin/palco', clone(palco), true).catch(e=>{ if (e.status === 401) logout(); }); }, 150);
+    palcoTimer = setTimeout(()=>{ api('PUT', '/api/admin/palco', {slide: palco.slide|0, dn: palco.dn|0, rev: palco.rev || {}}, true).catch(e=>{ if (e.status === 401) needLogin(); }); }, 150);
   }
   function go(i, push = true){
     cur = Math.max(0, Math.min(slides.length-1, i));
     slides.forEach((s,k)=>s.classList.toggle('active', k===cur));
     $('progress').style.width = ((cur+1)/slides.length*100)+'%';
-    const eb = slides[cur].querySelector('.eyebrow');
-    $('notes').innerHTML = '';
-    const nb = el('b',null,'Notas da apresentadora'); $('notes').append(nb, document.createTextNode(slides[cur].dataset.notes || ''));
+    $('notes').replaceChildren(el('b',null,'Notas da apresentadora'), document.createTextNode(slides[cur].dataset.notes || ''));
     if (push) { palco.slide = cur; pushPalco(); }
     if (slides[cur].querySelector('#rgDate')) rgRender();
   }
 
+  const toggleQr = ()=>{ $('qrOverlay').hidden = !$('qrOverlay').hidden; };
   document.addEventListener('keydown', e=>{
-    if (mode !== 'palco') return;
+    if (mode !== 'palco' || !editor) return;
     const t = e.target;
-    if (t && (t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && t.type !== 'checkbox'))) return;
+    if (t && (t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && t.type !== 'checkbox' && t.type !== 'range'))) return;
+    if (t && t.tagName === 'INPUT' && t.type === 'range' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) return;
     if (['ArrowRight','PageDown',' '].includes(e.key)) { e.preventDefault(); go(cur+1); }
     else if (['ArrowLeft','PageUp'].includes(e.key)) { e.preventDefault(); go(cur-1); }
     else if (e.key === 'Home') go(0);
@@ -237,38 +256,29 @@
   $('bNext').onclick = ()=>go(cur+1);
   $('bNotes').onclick = ()=>{ $('notes').hidden = !$('notes').hidden; };
   $('bHelp').onclick = ()=>{ $('help').hidden = !$('help').hidden; };
-  $('bAud').onclick = ()=>setMode('plateia');
-  $('goPalco').onclick = ()=>setMode('palco');
+  $('bAud').onclick = ()=>{ window.open('/', '_blank', 'noopener'); };
   $('bQa').onclick = ()=>toggleQa();
+  $('bQr').onclick = toggleQr; $('qrOverlay').onclick = toggleQr;
   $('qaClose').onclick = ()=>{ $('qa').hidden = true; };
-  document.querySelectorAll('[data-qr]').forEach(b=>{ const i = document.createElement('img'); i.src = '/qr.svg'; i.alt = 'QR code com o link do meetup'; b.append(i); });
-  fetch('/api/config').then(r=>r.json()).then(c=>{ $('qrUrl').textContent = String(c.url||'').replace(/^https?:\/\//,''); }).catch(()=>{ $('qrUrl').textContent = location.host; });
   $('bExport').onclick = async ()=>{
     try {
       const r = await fetch('/api/admin/export', {headers:{'x-admin': adminToken || ''}});
-      if (!r.ok) throw new Error(r.status);
-      const blob = await r.blob(), a = document.createElement('a');
-      a.href = URL.createObjectURL(blob); a.download = 'meetup-scd2-' + new Date().toISOString().slice(0,10) + '.json'; a.click();
-      setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
-    } catch(e){ $('bExport').textContent = 'Falhou, tente de novo'; setTimeout(()=>{ $('bExport').textContent = 'Exportar'; }, 2000); }
+      if (!r.ok) { if (r.status === 401) needLogin(); return; }
+      const blob = await r.blob(); const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'meetup-scd2-export.json'; document.body.append(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url), 5000);
+    } catch(e){}
   };
-  const toggleQr = ()=>{ $('qrOverlay').hidden = !$('qrOverlay').hidden; };
-  $('bQr').onclick = toggleQr; $('qrOverlay').onclick = toggleQr;
 
   document.querySelectorAll('.ask').forEach(a=>a.addEventListener('click', e=>{ if (e.target.closest('.lp')) return; a.classList.toggle('open'); }));
   document.querySelectorAll('[data-show]').forEach(b=>b.addEventListener('click', ()=>{ $(b.dataset.show).classList.add('show'); b.hidden = true; }));
   document.querySelectorAll('[data-toggle]').forEach(c=>c.addEventListener('click', ()=>{ const r = c.querySelector('.reveal'); r.classList.toggle('show'); const h = c.querySelector('.reveal-hint'); if (h) h.hidden = r.classList.contains('show'); }));
   document.querySelectorAll('.guess').forEach(g=>g.addEventListener('click', ()=>{ const on = !g.classList.contains('shown'); g.classList.toggle('shown', on); g.textContent = on ? g.dataset.answer : 'Como se escreve? ▸'; }));
-  document.querySelectorAll('.flip').forEach(f=>f.addEventListener('click', ()=>f.classList.toggle('on')));
   document.querySelectorAll('tr.clickable').forEach(r=>r.addEventListener('click', ()=>r.classList.toggle('picked')));
   const checks = [...document.querySelectorAll('.check input')];
   checks.forEach(c=>c.addEventListener('change', ()=>{ c.parentElement.classList.toggle('done', c.checked); $('chkCount').textContent = `${checks.filter(x=>x.checked).length} de ${checks.length}`; }));
 
-  // enquetes ao vivo no palco
-  function revealPoll(pid){
-    palco.rev = Object.assign({}, palco.rev, {[pid]: true});
-    pushPalco(); renderAll();
-  }
+  function revealPoll(pid){ palco.rev = Object.assign({}, palco.rev, {[pid]: true}); pushPalco(); renderAll(); }
   function renderStagePolls(){
     document.querySelectorAll('[data-lp]').forEach(box=>{
       const pid = box.dataset.lp, P = POLLS[pid], c = tally(pid), tot = c.reduce((a,b)=>a+b,0), rev = revealed(pid);
@@ -322,7 +332,7 @@
   $('wkYes').onclick = ()=>{ if (!wkDone) { wkDone = true; wkRender(); } };
   $('wkNo').onclick = ()=>{ if (wkDone) return; wkIdx++; if (wkIdx >= Q.length) wkDone = true; wkRender(); };
   $('wkReset').onclick = ()=>{ wkIdx = 0; wkDone = false; wkRender(); };
-  (function(){ const box = $('wkCases'); const l = el('span','small','Testar com:'); box.append(l); CASES.forEach(c=>{ const b = el('button','chip',c); b.type='button'; b.onclick = ()=>{ box.querySelectorAll('.chip').forEach(x=>x.classList.remove('on')); b.classList.add('on'); wkIdx=0; wkDone=false; wkRender(); }; box.append(b); }); })();
+  (function(){ const box = $('wkCases'); box.append(el('span','small','Testar com:')); CASES.forEach(c=>{ const b = el('button','chip',c); b.type='button'; b.onclick = ()=>{ box.querySelectorAll('.chip').forEach(x=>x.classList.remove('on')); b.classList.add('on'); wkIdx=0; wkDone=false; wkRender(); }; box.append(b); }); })();
   wkRender();
 
   /* ─── Régua ─── */
@@ -411,102 +421,86 @@
     $('bQa').classList.toggle('hot', pend.length > 0);
     $('rodadaCount').textContent = all.filter(q=>q.tipo==='rodada').length;
     if ($('qa').hidden) return;
-    let list = qaTab === 'respondidas' ? all.filter(q=>q.done) : all.filter(q=>q.tipo===qaTab && !q.done);
-    list.sort((a,b)=> (b.likes-a.likes) || (a.ts-b.ts));
+    const list = (qaTab === 'respondidas' ? all.filter(q=>q.done) : all.filter(q=>q.tipo===qaTab && !q.done)).sort((a,b)=> (b.likes-a.likes) || (a.ts-b.ts));
     const box = $('qaList'); box.replaceChildren();
     if (!list.length) { box.append(el('p','qa-empty', qaTab==='rodada' ? 'As respostas da rodada final aparecem aqui.' : (qaTab==='respondidas' ? 'Nada marcado como respondido ainda.' : 'Nenhuma pergunta pendente. Elas chegam pelo celular da plateia.'))); return; }
     list.forEach(q=>{
       const it = el('div','qa-item' + (q.done?' done':''));
       it.append(el('p','t',q.texto));
-      it.append(el('p','m', q.anon ? 'Sem nome' : (q.nome || 'Alguém')));
+      it.append(el('p','m', q.anon ? 'Sem nome' : (q.nome || 'Sem nome informado')));
       it.append(el('p','n','♥ ' + q.likes));
-      if (live && editor) { const b = el('button',null, q.done ? 'Reabrir' : 'Marcar como respondida'); b.type='button'; b.onclick = ()=>markDone(q.key, !q.done); it.append(b); }
+      if (editor) { const b = el('button',null, q.done ? 'Reabrir' : 'Marcar como respondida'); b.type='button'; b.onclick = ()=>markDone(q.id, !q.done); it.append(b); }
       box.append(it);
     });
   }
-  function markDone(key, val){
-    const q = (pub.perguntas || []).find(x=>x.id===key); if (q) q.done = !!val; renderAll();
-    api('PUT', '/api/admin/perguntas/' + encodeURIComponent(key) + '/respondida', {respondida: !!val}, true).catch(e=>{ if (e.status === 401) logout(); });
+  async function markDone(id, val){
+    const q = (S.perguntas || []).find(x=>String(x.id)===id); if (q) q.done = val; renderAll();
+    try { await api('PUT', '/api/admin/perguntas/' + encodeURIComponent(id) + '/respondida', {respondida: val}, true); } catch(e){ if (e.status === 401) needLogin(); }
   }
+
+  /* ─── Login da apresentadora ─── */
+  function needLogin(){ editor = false; adminToken = null; store.del('meetup_admin'); $('login').hidden = false; $('palco').hidden = true; setTimeout(()=>$('loginSenha').focus(), 50); }
+  $('loginForm').addEventListener('submit', async e=>{
+    e.preventDefault();
+    $('loginErr').hidden = true; $('loginBtn').disabled = true;
+    try {
+      const r = await api('POST', '/api/admin/login', {senha: $('loginSenha').value});
+      adminToken = r.token; store.set('meetup_admin', r.token); editor = true;
+      $('loginSenha').value = ''; $('login').hidden = true; setMode('palco');
+    } catch(err) {
+      $('loginErr').textContent = err.code === 'muitos_envios' ? 'Muitas tentativas. Espere um minuto.' : 'Senha incorreta.';
+      $('loginErr').hidden = false;
+    } finally { $('loginBtn').disabled = false; }
+  });
 
   /* ─── Modo e render ─── */
   function setMode(m){
     mode = m;
     $('plateia').hidden = m !== 'plateia';
-    $('login').hidden = m !== 'login';
     $('palco').hidden = m !== 'palco';
     document.body.classList.toggle('is-palco', m === 'palco');
-    if (m === 'palco') { fit(); go(palco.slide|0, false); }
+    if (m === 'palco') { palcoSynced = false; palco = {slide:S.palco.slide|0, dn:S.palco.dn|0, rev:Object.assign({}, S.palco.rev || {})}; if (live) palcoSynced = true; fit(); go(palco.slide, false); }
     renderAll();
   }
   function renderAll(){
-    if (mode === 'palco') { renderStagePolls(); dnRender(); renderQa(); const n = pub.votantes|0, k = Math.max(0, (pub.conectados|0) - 1); $('capaStats').textContent = live ? `${k} conectad${k===1?'a':'as'} · ${n} já ${n===1?'votou':'votaram'}` : 'Sem conexão com o servidor'; }
-    else if (mode === 'plateia') renderAudience();
-    $('audEditor').hidden = !editor;
-    $('audLive').classList.toggle('on', live); $('audStatus').textContent = live ? 'Ao vivo' : 'Sem conexão';
+    if (mode === 'palco') {
+      if (!$('palco').hidden) { renderStagePolls(); dnRender(); renderQa(); }
+      $('capaStats').textContent = live ? `${S.votantes|0} pessoa${(S.votantes|0)===1?'':'s'} já votou${(S.votantes|0)===1?'':'aram'} · ${Math.max(0,(S.conectados|0)-1)} conectada${(S.conectados|0)-1===1?'':'s'}` : 'Conectando ao servidor…';
+    } else renderAudience();
+    $('audLive').classList.toggle('on', live); $('audStatus').textContent = live ? 'Ao vivo' : 'Conectando…';
     $('hudLive').classList.toggle('on', live); $('hudLiveTxt').textContent = live ? 'ao vivo' : 'offline';
   }
 
   /* ─── Conexão ─── */
-  async function register(){
-    const r = await api('POST', '/api/participantes');
-    me = {id:r.id, token:r.token}; store.set('meetup.me', me);
-  }
-  async function loadMine(){
-    if (!me.id) return;
-    try {
-      const r = await api('GET', '/api/eu');
-      mine = {votos: isObj(r.votos) ? r.votos : {}, curtidas: Object.fromEntries((r.curtidas||[]).map(k=>[k,true]))};
-      myQIds = new Set(r.perguntas || []);
-      if (!$('qName').value && r.nome) $('qName').value = r.nome;
-    } catch(e){
-      if (e.status === 401) { me = {id:null, token:null}; store.set('meetup.me', null); await register(); mine = {votos:{}, curtidas:{}}; myQIds = new Set(); }
+  fetch('/api/config').then(r=>r.json()).then(c=>{ if (c && c.url) $('qrUrl').textContent = String(c.url).replace(/^https?:\/\//,''); }).catch(()=>{});
+
+  function onState(next){
+    if (!isObj(next)) return;
+    S = {palco: isObj(next.palco) ? next.palco : {slide:0,dn:0,rev:{}}, tallies: isObj(next.tallies) ? next.tallies : {}, perguntas: Array.isArray(next.perguntas) ? next.perguntas : [], votantes: next.votantes|0, conectados: next.conectados|0};
+    live = true;
+    if (mode === 'palco' && editor) {
+      // a apresentadora é a única que muda o palco: depois da 1ª sincronização, o estado local manda
+      if (!palcoSynced) { palcoSynced = true; palco = {slide:S.palco.slide|0, dn:S.palco.dn|0, rev:Object.assign({}, S.palco.rev || {})}; go(palco.slide, false); }
+    } else {
+      palco = {slide:S.palco.slide|0, dn:S.palco.dn|0, rev:Object.assign({}, S.palco.rev || {})};
     }
-  }
-  function applyState(s){
-    const v = s.palco;
-    if (isObj(v)) {
-      const next = {slide: Number.isInteger(v.slide) ? v.slide : 0, dn: Number.isInteger(v.dn) ? v.dn : 0, rev: isObj(v.rev) ? Object.assign({}, v.rev) : {}};
-      if (mode === 'palco' && palcoSynced) { palco.rev = next.rev; palco.dn = next.dn; }
-      else { palco = next; if (mode === 'palco') { palcoSynced = true; go(palco.slide, false); } }
-    }
-    pub = {tallies: isObj(s.tallies) ? s.tallies : {}, perguntas: Array.isArray(s.perguntas) ? s.perguntas : [], votantes: s.votantes|0, conectados: s.conectados|0};
     renderAll();
   }
   function connect(){
-    const es = new EventSource('/api/eventos');
-    es.addEventListener('estado', e=>{ try { live = true; applyState(JSON.parse(e.data)); } catch(_){} });
-    es.onopen = ()=>{ live = true; loadMine().then(renderAll); };
+    let es;
+    try { es = new EventSource('/api/eventos'); } catch(e){ setTimeout(connect, 3000); return; }
+    es.addEventListener('estado', ev=>{ try { onState(JSON.parse(ev.data)); } catch(e){} });
     es.onerror = ()=>{ live = false; renderAll(); };
   }
-  function logout(){ adminToken = null; store.set('meetup.admin', null); editor = false; setMode(location.pathname === '/palco' ? 'login' : 'plateia'); }
-
-  $('loginForm').addEventListener('submit', async e=>{
-    e.preventDefault();
-    const err = $('loginErr'); err.hidden = true;
-    try {
-      const r = await api('POST', '/api/admin/login', {senha: $('loginPw').value});
-      adminToken = r.token; store.set('meetup.admin', adminToken); editor = true; palcoSynced = false;
-      $('loginPw').value = ''; setMode('palco');
-      const s = await api('GET', '/api/estado'); applyState(s);
-    } catch(e){ err.textContent = e.status === 429 ? 'Muitas tentativas. Espere um minuto.' : 'Senha incorreta.'; err.hidden = false; }
-  });
-  $('qName').value = store.get('meetup.nome') || '';
-  $('qName').addEventListener('change', ()=>store.set('meetup.nome', $('qName').value.trim()));
 
   renderAll();
-  (async function(){
-    const saved = store.get('meetup.me');
-    if (saved && typeof saved.id === 'string' && typeof saved.token === 'string') me = saved;
-    try { if (!me.id) await register(); } catch(_){}
-    const t = store.get('meetup.admin');
-    if (typeof t === 'string') {
-      adminToken = t;
-      try { await api('GET', '/api/admin/check', undefined, true); editor = true; } catch(_){ adminToken = null; store.set('meetup.admin', null); }
-    }
-    const wantsPalco = location.pathname === '/palco' || location.hash === '#palco';
-    if (wantsPalco) setMode(editor ? 'palco' : 'login'); else setMode('plateia');
-    await loadMine();
-    connect();
-  })();
+  if (IS_PALCO) {
+    $('plateia').hidden = true;
+    if (adminToken) api('GET', '/api/admin/check', undefined, true).then(()=>{ editor = true; setMode('palco'); }).catch(needLogin);
+    else needLogin();
+  } else {
+    setMode('plateia');
+    initParticipante();
+  }
+  connect();
 })();
