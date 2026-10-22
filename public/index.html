@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Meetup SCD Tipo 2</title>
+<meta name="description" content="Meetup Analytics Engineering · SCD Tipo 2 — votações e perguntas ao vivo">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..700&family=DM+Sans:wght@300..700&family=DM+Mono:wght@400;500&display=swap">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23164F3C'/%3E%3Ctext x='16' y='22' font-size='15' font-family='Georgia' font-weight='700' text-anchor='middle' fill='%23F2B58F'%3E2%3C/text%3E%3C/svg%3E">
+<style>
+  [hidden] { display: none !important; }
+  img { max-width: 100%; }
+</style>
+<style>
+  /* Layout: duas faces da mesma página. Plateia = coluna única no celular; palco = canvas 16:9 escalado. */
+  :root {
+    /* plateia (claro) */
+    --a-bg: #F5F3EE; --a-surface: #FDFCF9; --a-line: #DED8CB; --a-fg: #1E293B; --a-muted: #5A6472;
+    --a-accent: #1B6B50; --a-accent-fg: #FFFFFF; --a-warm: #A8552F; --a-warm-soft: #F8E6DC; --a-ok-soft: #DCEBE3; --a-bar: rgba(204,112,69,.22);
+    /* palco (visual único, deliberadamente fixo) */
+    --green-deep: #1B6B50; --green-dark: #164F3C; --green-ink: #0F3A2C; --green-light: #DCEBE3; --green-wash: #E8F1EC;
+    --orange: #CC7045; --orange-ink: #A8552F; --orange-light: #F8E6DC; --peach: #F2B58F;
+    --plum: #9E396C; --plum-dark: #8A2F5D; --bg: #F5F3EE; --card: #FDFCF9; --line: #DED8CB;
+    --text: #1E293B; --body: #3F4A5A; --muted: #5A6472; --code-bg: #0F1923; --stage-ground: #0C1F18;
+    --f-display: 'Playfair Display', Georgia, serif;
+    --f-body: 'DM Sans', 'Helvetica Neue', Arial, sans-serif;
+    --f-mono: 'DM Mono', 'Courier New', monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --a-bg: #0F1F19; --a-surface: #16302A; --a-line: #2A4A3F; --a-fg: #E8EFEB; --a-muted: #9DB4AA;
+    --a-accent: #7CE0BF; --a-accent-fg: #0F2A21; --a-warm: #F2B58F; --a-warm-soft: #3A2A20; --a-ok-soft: #1F3D33; --a-bar: rgba(242,181,143,.22);
+    color-scheme: dark; } }
+  :root[data-theme="dark"] {
+    --a-bg: #0F1F19; --a-surface: #16302A; --a-line: #2A4A3F; --a-fg: #E8EFEB; --a-muted: #9DB4AA;
+    --a-accent: #7CE0BF; --a-accent-fg: #0F2A21; --a-warm: #F2B58F; --a-warm-soft: #3A2A20; --a-ok-soft: #1F3D33; --a-bar: rgba(242,181,143,.22);
+    color-scheme: dark; }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--f-body); background: var(--a-bg); color: var(--a-fg); }
+  body.is-palco { background: var(--stage-ground); overflow: hidden; height: 100%; }
+  html:has(body.is-palco) { height: 100%; overflow: hidden; }
+  button { font-family: inherit; cursor: pointer; }
+  button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+  /* ═════════ PLATEIA ═════════ */
+  .aud { max-width: 560px; margin: 0 auto; padding-block: 20px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 18px; }
+  .aud-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .aud-brand { margin: 0; font-family: var(--f-display); font-size: 22px; font-weight: 700; }
+  .aud-live { margin: 0; font-size: 13px; color: var(--a-muted); display: flex; align-items: center; gap: 6px; }
+  .aud-live .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--a-muted); }
+  .aud-live.on .dot { background: #2FA97C; box-shadow: 0 0 0 4px rgba(47,169,124,.18); }
+  .tabs { display: grid; grid-template-columns: 1fr 1fr; background: var(--a-surface); border: 1px solid var(--a-line); border-radius: 12px; padding: 4px; }
+  .tabs button { border: 0; background: transparent; color: var(--a-muted); font-size: 15px; font-weight: 600; padding: 10px; border-radius: 9px; }
+  .tabs button.on { background: var(--a-accent); color: var(--a-accent-fg); }
+  .aud-eyebrow { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; color: var(--a-warm); }
+  .aud h1 { margin: 6px 0 0; font-family: var(--f-display); font-size: 26px; line-height: 1.2; text-wrap: balance; }
+  .acard { background: var(--a-surface); border: 1px solid var(--a-line); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+  .acard .q { margin: 0; font-size: 18px; font-weight: 600; line-height: 1.4; }
+  .acard .hint { margin: 0; font-size: 14px; color: var(--a-muted); line-height: 1.5; }
+  .aopt { position: relative; overflow: hidden; display: flex; justify-content: space-between; gap: 10px; align-items: center; text-align: left; width: 100%; border: 1.5px solid var(--a-line); background: var(--a-bg); color: var(--a-fg); border-radius: 12px; padding: 14px 16px; font-size: 16px; font-weight: 500; }
+  .aopt .fill { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--a-bar); transition: width .4s; }
+  .aopt span, .aopt b { position: relative; }
+  .aopt b { font-family: var(--f-mono); font-size: 15px; }
+  .aopt.mine { border-color: var(--a-accent); box-shadow: inset 0 0 0 1px var(--a-accent); }
+  .aopt.ok { border-color: var(--a-accent); background: var(--a-ok-soft); }
+  .aopt:disabled { cursor: default; opacity: .6; }
+  .ans { margin: 0; border-left: 4px solid var(--a-accent); background: var(--a-ok-soft); padding: 12px 14px; border-radius: 0 10px 10px 0; font-size: 15px; line-height: 1.5; }
+  .abtn { border: 0; background: var(--a-accent); color: var(--a-accent-fg); font-size: 16px; font-weight: 700; padding: 13px 18px; border-radius: 12px; }
+  .abtn.ghost { background: transparent; color: var(--a-accent); border: 1.5px solid var(--a-accent); }
+  .abtn:disabled { opacity: .45; cursor: default; }
+  textarea { width: 100%; min-height: 96px; resize: vertical; font: inherit; font-size: 16px; color: var(--a-fg); background: var(--a-bg); border: 1.5px solid var(--a-line); border-radius: 12px; padding: 12px; }
+  .arow { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .achk { display: flex; gap: 8px; align-items: center; font-size: 14px; color: var(--a-muted); }
+  .achk input { width: 18px; height: 18px; accent-color: var(--a-accent); }
+  .qlist { display: flex; flex-direction: column; gap: 10px; }
+  .qitem { background: var(--a-surface); border: 1px solid var(--a-line); border-radius: 14px; padding: 14px 16px; display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; }
+  .qitem p { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+  .qitem .qt { font-size: 16px; line-height: 1.45; }
+  .qitem .qm { font-size: 13px; color: var(--a-muted); grid-column: 1; }
+  .qitem.done { opacity: .6; }
+  .qitem.done .qt { text-decoration: line-through; }
+  .like { grid-row: 1 / span 2; grid-column: 2; align-self: start; border: 1.5px solid var(--a-line); background: var(--a-bg); color: var(--a-fg); border-radius: 10px; padding: 8px 10px; font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 56px; }
+  .like.on { border-color: var(--a-warm); color: var(--a-warm); background: var(--a-warm-soft); }
+  .qdel { border: 0; background: none; color: var(--a-muted); text-decoration: underline; font-size: 13px; padding: 0; justify-self: start; }
+  .empty { text-align: center; color: var(--a-muted); font-size: 15px; padding: 24px 8px; border: 1.5px dashed var(--a-line); border-radius: 14px; margin: 0; }
+  .aud-note { margin: 0; font-size: 13px; color: var(--a-muted); line-height: 1.5; }
+  .aud-err { margin: 0; font-size: 14px; color: var(--a-warm); }
+  .linklike { border: 0; background: none; color: var(--a-accent); font-weight: 600; text-decoration: underline; font-size: 14px; padding: 0; }
+
+  /* ═════════ PALCO ═════════ */
+  #viewport { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+  #stage { width: 1600px; height: 900px; position: relative; transform-origin: center center; flex-shrink: 0; color: var(--text); }
+  #stage p, #stage h1, #stage h2, #stage h3 { margin: 0; }
+  .slide { position: absolute; inset: 0; padding: 88px 104px 104px; display: none; flex-direction: column; gap: 30px; background: var(--bg); overflow: hidden; border-radius: 6px; }
+  .slide.active { display: flex; animation: enter .45s ease both; }
+  @keyframes enter { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  .slide.dark { background: var(--green-dark); color: #F5F3EE; }
+  .slide.wash { background: var(--green-wash); }
+  .slide.plum { background: var(--plum); color: #FBF3F6; }
+  .eyebrow { font-size: 15px; font-weight: 700; letter-spacing: 3.5px; text-transform: uppercase; color: var(--orange-ink); display: flex; align-items: center; gap: 12px; }
+  .eyebrow::before { content: ''; width: 26px; height: 2px; background: currentColor; }
+  .dark .eyebrow { color: var(--peach); }
+  .plum .eyebrow { color: #FBD9E6; }
+  #stage h1, #stage h2 { font-family: var(--f-display); font-weight: 700; line-height: 1.08; }
+  #stage h2 { font-size: 50px; max-width: 1320px; text-wrap: balance; }
+  #stage h2 em { font-style: normal; color: var(--green-deep); }
+  .dark h2 em { color: #7CE0BF !important; }
+  #stage h3 { font-size: 24px; font-weight: 700; line-height: 1.25; }
+  .serif { font-family: var(--f-display); }
+  .mono { font-family: var(--f-mono); }
+  #stage p { line-height: 1.5; }
+  .lead { font-size: 21px; color: var(--body); max-width: 1100px; }
+  .head { display: flex; flex-direction: column; gap: 14px; }
+  .row { display: flex; gap: 20px; }
+  .col { display: flex; flex-direction: column; gap: 16px; }
+  .grow { flex: 1; min-width: 0; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 22px 24px; }
+  .dark .card { background: #1A4A3A; border-color: #2F7A5F; color: #F5F3EE; }
+  .bar { width: 52px; height: 5px; border-radius: 3px; margin-bottom: 12px; }
+  .pill { display: inline-block; font-size: 14px; font-weight: 600; padding: 5px 13px; border-radius: 999px; background: #EDE9E0; color: var(--text); }
+  .small { font-size: 16px; color: var(--muted); }
+  .dark .small { color: #A9C9BC; }
+  .ex { font-size: 16px; color: var(--green-deep); margin-top: 8px !important; }
+  .dark .ex { color: var(--peach); }
+  .btn { font-size: 16px; font-weight: 600; padding: 11px 20px; border-radius: 10px; border: 1.5px solid var(--green-deep); background: transparent; color: var(--green-deep); transition: all .2s; }
+  .btn:hover { background: var(--green-deep); color: #fff; }
+  .btn.solid { background: var(--green-deep); color: #fff; }
+  .btn.orange { border-color: var(--orange-ink); color: var(--orange-ink); }
+  .btn.orange:hover { background: var(--orange-ink); color: #fff; }
+  .dark .btn { border-color: var(--peach); color: var(--peach); }
+  .dark .btn:hover, .dark .btn.solid { background: var(--peach); color: var(--green-ink); }
+  .btn:disabled { opacity: .35; cursor: default; }
+
+  .ask { position: absolute; right: 104px; bottom: 36px; max-width: 760px; display: flex; align-items: flex-start; gap: 14px; background: var(--orange-ink); color: #FFF7F1; border-radius: 16px; padding: 14px 20px 14px 16px; box-shadow: 0 14px 40px rgba(0,0,0,.18); cursor: pointer; z-index: 3; }
+  .ask .ask-ico { flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; background: rgba(255,255,255,.18); display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 700; }
+  .ask .ask-label { font-size: 12px; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; opacity: .85; margin-top: 2px !important; }
+  .ask .ask-q { display: none; font-family: var(--f-display); font-size: 23px; line-height: 1.3 !important; margin-top: 4px !important; }
+  .ask .ask-body { display: none; margin-top: 10px; }
+  .ask.open .ask-q, .ask.open .ask-body { display: block; }
+  .ask.open { max-width: 900px; }
+  .ask .ask-hint { font-size: 13px; opacity: .8; }
+  .ask.open .ask-hint { display: none; }
+  .phone-tag { display: inline-flex; gap: 6px; align-items: center; font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; background: rgba(27,107,80,.12); color: var(--green-deep); }
+  .dark .phone-tag, .plum .phone-tag, .ask .phone-tag { background: rgba(255,255,255,.16); color: #fff; }
+
+  .reveal { display: none; }
+  .reveal.show { display: block; animation: enter .35s ease both; }
+  .answer-box { border-left: 4px solid var(--green-deep); background: var(--green-light); padding: 14px 18px; border-radius: 0 10px 10px 0; font-size: 18px; color: var(--text); }
+
+  /* enquete ao vivo (palco) */
+  .lp { display: flex; flex-direction: column; gap: 10px; }
+  .lp-row { position: relative; overflow: hidden; display: grid; grid-template-columns: 1fr 64px; gap: 12px; align-items: center; background: var(--card); border: 1.5px solid var(--line); border-radius: 12px; padding: 12px 18px; color: var(--text); text-align: left; font-size: 19px; }
+  .lp-row .fill { position: absolute; inset: 0 auto 0 0; width: 0; background: rgba(204,112,69,.18); transition: width .45s ease; }
+  .lp-row span, .lp-row b { position: relative; }
+  .lp-row b { text-align: right; font-family: var(--f-mono); font-size: 20px; font-variant-numeric: tabular-nums; }
+  .lp-row.ok { border-color: var(--green-deep); background: var(--green-light); }
+  .lp-row.ok span::after { content: '  ✓ resposta'; font-size: 13px; font-weight: 700; letter-spacing: 1px; color: var(--green-deep); }
+  .dark .lp-row { background: #1A4A3A; border-color: #2F7A5F; color: #F5F3EE; }
+  .dark .lp-row .fill { background: rgba(242,181,143,.2); }
+  .lp-meta { display: flex; gap: 14px; align-items: center; font-size: 15px; color: var(--muted); }
+  .dark .lp-meta { color: #A9C9BC; }
+  .lp-meta .lp-total { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+  .lp.compact .lp-row { font-size: 16px; padding: 8px 14px; }
+  .lp.compact .lp-row b { font-size: 16px; }
+  .ask .lp-row { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.25); color: #fff; }
+  .ask .lp-row .fill { background: rgba(255,255,255,.18); }
+  .ask .lp-row.ok { background: rgba(255,255,255,.28); border-color: #fff; }
+  .ask .lp-row.ok span::after { color: #fff; }
+  .ask .lp-meta { color: rgba(255,255,255,.85); }
+  .lp-hidden { font-size: 15px; color: var(--muted); }
+  .dark .lp-hidden, .ask .lp-hidden { color: inherit; opacity: .8; }
+
+  .flip { perspective: 1200px; cursor: pointer; flex: 1; height: 330px; }
+  .flip-inner { position: relative; width: 100%; height: 100%; transition: transform .6s; transform-style: preserve-3d; }
+  .flip.on .flip-inner { transform: rotateY(180deg); }
+  .flip-face { position: absolute; inset: 0; backface-visibility: hidden; border-radius: 14px; padding: 24px; display: flex; flex-direction: column; gap: 10px; }
+  .flip-front { background: var(--card); border: 1px solid var(--line); }
+  .flip-back { background: var(--green-dark); color: #F5F3EE; transform: rotateY(180deg); }
+  .flip-front .tap { margin-top: auto !important; font-size: 13px; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; font-weight: 700; }
+
+  #stage table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; font-size: 18px; color: var(--text); }
+  #stage th { background: var(--green-dark); color: #F5F3EE; text-align: left; padding: 12px 16px; font-size: 14px; letter-spacing: 1.5px; text-transform: uppercase; }
+  #stage td { padding: 12px 16px; border-top: 1px solid var(--line); vertical-align: top; }
+  tr.hl td { background: var(--green-light); }
+  tr.clickable { cursor: pointer; }
+  tr.clickable:hover td { background: #EFEBE2; }
+  tr.picked td { background: var(--orange-light) !important; }
+  .code { background: var(--code-bg); color: #CDE3DA; border-radius: 14px; padding: 20px 24px; font-family: var(--f-mono); font-size: 16.5px; line-height: 1.7; white-space: pre; overflow: hidden; }
+  .code .k { color: #cba6f7; } .code .s { color: #a6e3a1; } .code .c { color: #6c7086; font-style: italic; }
+
+  .walker { display: grid; grid-template-columns: 1fr 470px; gap: 28px; }
+  .steps { display: flex; flex-direction: column; gap: 10px; }
+  .step { display: flex; align-items: center; gap: 16px; background: var(--card); border: 1.5px solid var(--line); border-radius: 12px; padding: 12px 18px; opacity: .45; transition: all .3s; }
+  .step.current { opacity: 1; border-color: var(--orange); box-shadow: 0 6px 24px rgba(168,85,47,.12); }
+  .step.passed { opacity: .75; }
+  .step.hit { opacity: 1; border-color: var(--green-deep); background: var(--green-light); }
+  .step .n { font-family: var(--f-display); font-size: 26px; font-weight: 700; color: var(--orange-ink); width: 28px; }
+  .step .q { font-size: 18px; font-weight: 600; }
+  .step .q small { display: block; font-weight: 400; font-size: 14px; color: var(--muted); }
+  .step .tag { margin-left: auto; font-size: 13px; font-weight: 700; padding: 4px 10px; border-radius: 6px; white-space: nowrap; }
+  .result-card { border-radius: 16px; padding: 26px; color: #F5F3EE; min-height: 220px; display: flex; flex-direction: column; gap: 10px; transition: background .3s; }
+  .case-chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .chip { font-size: 14px; font-weight: 600; padding: 7px 13px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--card); color: var(--text); }
+  .chip.on { border-color: var(--orange); background: var(--orange-light); color: var(--orange-ink); }
+
+  .tl { display: grid; grid-template-columns: 210px repeat(4, 1fr); gap: 8px; position: relative; }
+  .tl .lab { font-size: 17px; font-weight: 700; display: flex; align-items: center; }
+  .tl .m { font-size: 14px; font-weight: 700; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; }
+  .seg { border-radius: 9px; padding: 14px; font-size: 16px; font-weight: 600; transition: all .3s; border: 2px solid transparent; }
+  .seg.def { background: #D5DDD9; }
+  .seg.spec { background: var(--plum); color: #fff; }
+  .seg.active { border-color: var(--orange); box-shadow: 0 0 0 3px rgba(204,112,69,.25); }
+  .seg.off { opacity: .25; }
+  #cursor { position: absolute; top: 0; bottom: 0; width: 3px; background: var(--orange); pointer-events: none; transition: left .15s; }
+  #cursor span { position: absolute; top: -26px; left: 50%; transform: translateX(-50%); background: var(--orange-ink); color: #fff; font-size: 13px; font-weight: 700; padding: 3px 9px; border-radius: 6px; white-space: nowrap; }
+  input[type=range] { width: 100%; accent-color: var(--orange); height: 28px; }
+  .toggle { display: inline-flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 600; cursor: pointer; user-select: none; }
+  .toggle input { width: 20px; height: 20px; accent-color: var(--plum); }
+
+  .hours { display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px; }
+  .hour { border-radius: 12px; padding: 14px; background: var(--card); border: 1.5px dashed #CFDDD5; min-height: 118px; display: flex; flex-direction: column; gap: 4px; transition: all .3s; }
+  .hour.done { border-style: solid; }
+  .hour.write { border-color: var(--green-deep); background: #fff; }
+  .hour.skip { background: #EEF2EF; color: var(--muted); }
+  .hour .h { font-size: 14px; color: var(--muted); font-weight: 600; }
+  .hour .st { font-size: 17px; font-weight: 700; }
+  .hour .act { font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-top: auto; }
+  .counter { display: flex; gap: 40px; }
+  .counter div b { display: block; font-family: var(--f-display); font-size: 52px; line-height: 1; color: var(--green-dark); }
+  .counter div span { font-size: 14px; color: var(--muted); }
+
+  .check { display: flex; gap: 12px; align-items: flex-start; font-size: 18px; padding: 9px 0; border-bottom: 1px solid var(--line); cursor: pointer; user-select: none; }
+  .check input { width: 20px; height: 20px; margin-top: 3px; accent-color: var(--green-deep); flex-shrink: 0; }
+  .check.done span { color: var(--muted); text-decoration: line-through; }
+
+  .vote-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+  .vote { border-radius: 12px; padding: 14px; border: 2px solid #2F7A5F; background: #1A4A3A; color: #F5F3EE; text-align: left; display: flex; flex-direction: column; gap: 6px; position: relative; overflow: hidden; }
+  .vote .vn { font-size: 16px; font-weight: 700; position: relative; }
+  .vote .vc { font-family: var(--f-mono); font-size: 28px; position: relative; font-variant-numeric: tabular-nums; }
+  .vote .vf { position: absolute; left: 0; bottom: 0; height: 5px; background: var(--peach); width: 0; transition: width .4s; }
+  .vote.correct { border-color: #7CE0BF; background: #1F5E47; }
+  .vote.correct::after { content: 'GABARITO'; position: absolute; right: 10px; top: 10px; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; color: #7CE0BF; }
+  .case-dots { display: flex; gap: 8px; }
+  .case-dots i { width: 34px; height: 6px; border-radius: 3px; background: #2F7A5F; }
+  .case-dots i.on { background: var(--peach); }
+  #timer { font-family: var(--f-mono); font-size: 22px; padding: 8px 16px; border-radius: 10px; background: #1A4A3A; border: 1px solid #2F7A5F; color: #F5F3EE; }
+  #timer.warn { color: var(--peach); border-color: var(--peach); }
+
+  #progress { position: fixed; left: 0; top: env(safe-area-inset-top, 0px); height: 4px; background: var(--orange); transition: width .3s; z-index: 10; }
+  #hud { position: fixed; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px max(18px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(18px, env(safe-area-inset-left, 0px)); z-index: 10; font-size: 13px; color: rgba(255,255,255,.6); }
+  #hud .nav { display: flex; gap: 8px; flex-wrap: wrap; }
+  #hud button { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15); color: rgba(255,255,255,.8); border-radius: 8px; padding: 6px 12px; font-size: 13px; }
+  #hud button:hover { background: rgba(255,255,255,.18); }
+  #hud button.hot { background: var(--orange-ink); border-color: var(--orange-ink); color: #fff; }
+  #hudLive { display: inline-flex; align-items: center; gap: 6px; }
+  #hudLive i { width: 7px; height: 7px; border-radius: 50%; background: #6B7F77; }
+  #hudLive.on i { background: #3CCB95; }
+  #notes { position: fixed; left: 50%; bottom: 56px; transform: translateX(-50%); width: min(900px, 92vw); background: rgba(12,31,24,.97); color: #E6F0EB; border: 1px solid #2F7A5F; border-radius: 14px; padding: 18px 22px; font-size: 15px; line-height: 1.6; z-index: 20; }
+  #notes b { color: var(--peach); font-size: 12px; letter-spacing: 2px; text-transform: uppercase; display: block; margin-bottom: 6px; }
+  #help { position: fixed; top: calc(16px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); background: rgba(12,31,24,.97); color: #E6F0EB; border: 1px solid #2F7A5F; border-radius: 12px; padding: 16px 20px; font-size: 14px; line-height: 1.9; z-index: 20; }
+  kbd { font-family: var(--f-mono); background: rgba(255,255,255,.12); border-radius: 4px; padding: 1px 6px; }
+
+  /* painel de perguntas (palco) */
+  .qr-box { background: #FFFFFF; border-radius: 14px; padding: 12px; line-height: 0; }
+  .qr-box svg { width: 100%; height: auto; display: block; }
+  #qrOverlay { position: fixed; inset: 0; z-index: 40; background: rgba(12,31,24,.94); display: flex; align-items: center; justify-content: center; gap: 56px; flex-wrap: wrap; padding: 32px; color: #F5F3EE; cursor: pointer; }
+  #qrOverlay .qr-box { width: min(520px, 70vh, 80vw); padding: 22px; }
+  #qrOverlay h2 { margin: 0 0 12px; font-family: var(--f-display); font-size: clamp(28px, 4vw, 52px); line-height: 1.1; }
+  #qrOverlay p { margin: 0; font-size: 18px; color: #CDE3DA; line-height: 1.6; }
+  #qrOverlay .mono { font-family: var(--f-mono); font-size: 15px; color: var(--peach); overflow-wrap: anywhere; }
+  #qa { position: fixed; top: 0; right: 0; bottom: 0; width: min(460px, 100vw); background: #F5F3EE; color: #1E293B; z-index: 30; display: flex; flex-direction: column; box-shadow: -20px 0 60px rgba(0,0,0,.35); padding: calc(18px + env(safe-area-inset-top, 0px)) max(18px, env(safe-area-inset-right, 0px)) calc(18px + env(safe-area-inset-bottom, 0px)) 18px; gap: 12px; }
+  #qa header { display: flex; justify-content: space-between; align-items: center; }
+  #qa h2 { margin: 0; font-family: var(--f-display); font-size: 24px; }
+  #qa .qa-tabs { display: flex; gap: 6px; }
+  #qa .qa-tabs button { border: 1.5px solid #DED8CB; background: #FDFCF9; color: #3F4A5A; border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; }
+  #qa .qa-tabs button.on { background: #1B6B50; border-color: #1B6B50; color: #fff; }
+  #qa .qa-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 4px; }
+  #qa .qa-item { background: #FDFCF9; border: 1px solid #DED8CB; border-radius: 12px; padding: 12px 14px; display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; }
+  #qa .qa-item p { margin: 0; overflow-wrap: anywhere; min-width: 0; }
+  #qa .qa-item .t { font-size: 16px; line-height: 1.45; }
+  #qa .qa-item .m { font-size: 12px; color: #5A6472; }
+  #qa .qa-item .n { grid-row: 1 / span 2; grid-column: 2; font-family: var(--f-mono); font-size: 18px; font-weight: 500; color: #A8552F; text-align: right; }
+  #qa .qa-item.done { opacity: .5; }
+  #qa .qa-item button { justify-self: start; border: 0; background: none; color: #1B6B50; font-size: 12px; font-weight: 700; text-decoration: underline; padding: 0; }
+  #qa .qa-empty { color: #5A6472; font-size: 14px; text-align: center; padding: 30px 10px; border: 1.5px dashed #DED8CB; border-radius: 12px; }
+  #qa .x { border: 0; background: none; font-size: 24px; color: #5A6472; }
+  .ainput { width: 100%; font: inherit; font-size: 16px; color: var(--a-fg); background: var(--a-bg); border: 1.5px solid var(--a-line); border-radius: 12px; padding: 12px; }
+  .qr-box img { width: 100%; height: auto; display: block; }
+</style>
+
+</head>
+<body>
+<main class="aud" id="plateia">
+  <header class="aud-top">
+    <p class="aud-brand">Meetup AE · SCD Tipo 2</p>
+    <p class="aud-live" id="audLive"><span class="dot"></span><span id="audStatus">Conectando…</span></p>
+  </header>
+  <div class="tabs" role="tablist">
+    <button id="tabAgora" class="on" role="tab" aria-selected="true">Agora</button>
+    <button id="tabPerg" role="tab" aria-selected="false">Perguntas <span id="qCount"></span></button>
+  </div>
+  <section id="vAgora" class="col" style="gap:14px">
+    <div>
+      <p class="aud-eyebrow" id="audSlide">Antes de começar</p>
+      <h1 id="audTitle">Quando a apresentação começar, as votações aparecem aqui</h1>
+    </div>
+    <div id="audCard" class="acard">
+      <p class="q">Deixe esta tela aberta.</p>
+      <p class="hint">A cada pergunta da apresentação, você vota por aqui. Dúvidas podem ser enviadas a qualquer momento na aba Perguntas.</p>
+    </div>
+  </section>
+  <section id="vPerg" class="col" style="gap:14px" hidden>
+    <form id="qForm" class="acard">
+      <label for="qText" class="q">Mande sua pergunta para a Erika</label>
+      <textarea id="qText" maxlength="280" placeholder="Ex.: Quando snapshot fica caro demais, quando vale migrar para Merge + SCD2?"></textarea>
+      <input id="qName" class="ainput" maxlength="60" autocomplete="name" placeholder="Seu nome (opcional)" aria-label="Seu nome">
+      <div class="arow">
+        <label class="achk"><input type="checkbox" id="qAnon"> Não mostrar meu nome</label>
+        <button class="abtn" id="qSend" type="submit">Enviar</button>
+      </div>
+      <p class="aud-err" id="qErr" hidden></p>
+    </form>
+    <p class="aud-note">Curta as perguntas que você também quer ver respondidas. As mais curtidas sobem.</p>
+    <div class="qlist" id="qList"><p class="empty">Nenhuma pergunta ainda. Seja a primeira pessoa a perguntar.</p></div>
+  </section>
+  <p class="aud-note" id="audEditor" hidden>Você está como apresentadora. <button class="linklike" id="goPalco">Abrir modo apresentadora</button></p>
+</main>
+
+<!-- ═════════ LOGIN DA APRESENTADORA ═════════ -->
+<main class="aud" id="login" hidden>
+  <p class="aud-brand">Meetup AE · SCD Tipo 2</p>
+  <form id="loginForm" class="acard">
+    <p class="aud-eyebrow">Modo apresentadora</p>
+    <label for="loginPw" class="q">Senha</label>
+    <input type="password" id="loginPw" class="ainput" autocomplete="current-password" required>
+    <button class="abtn" type="submit">Entrar</button>
+    <p class="aud-err" id="loginErr" hidden></p>
+  </form>
+  <p class="aud-note">É da plateia? <a class="linklike" href="/">Entre por aqui</a>.</p>
+</main>
+
+<!-- ═════════ PALCO ═════════ -->
+<div id="palco" hidden>
+<div id="progress"></div>
+<div id="viewport"><div id="stage">
+
+<!-- 0 · CAPA -->
+<section class="slide dark" data-notes="Abertura. Peça para todos apontarem a câmera para o QR code (tecla C mostra o código em tela cheia a qualquer momento): as votações e as perguntas chegam ao vivo nesta tela. A bolinha verde no rodapé indica conexão. Tecla P abre o painel de perguntas; N mostra estas notas; Q abre a pergunta para a sala." style="justify-content:center;gap:28px;background:radial-gradient(circle at 82% 30%, rgba(204,112,69,.28), transparent 45%), var(--green-dark)">
+  <p class="eyebrow">Meetup Analytics Engineering · Chapter AE</p>
+  <h1 style="font-size:104px;font-weight:900;max-width:820px">SCD Tipo 2</h1>
+  <p style="font-size:30px;color:#CDE3DA;max-width:760px;line-height:1.35">Memória auditável, com governança e performance: o que aprendemos no Bloqueio Global</p>
+  <div class="col" style="gap:4px;margin-top:8px">
+    <p style="font-size:21px;font-weight:600">Erika Medeiros · Analytics Engineer Specialist</p>
+    <p style="font-size:19px;color:#A9C9BC">Quinta-feira · 11h</p>
+  </div>
+  <div class="card" style="position:absolute;right:104px;top:130px;width:440px;display:flex;flex-direction:column;gap:12px;background:var(--green-ink)">
+    <p class="phone-tag" style="align-self:flex-start">📱 Aponte a câmera</p>
+    <div class="qr-box" data-qr style="width:240px;align-self:center"></div>
+    <p style="font-size:19px">Você vota nas perguntas e manda dúvidas por lá, ao vivo.</p>
+    <p class="mono small" id="capaStats">0 pessoas conectadas</p>
+  </div>
+</section>
+
+<!-- 1 · AQUECIMENTO -->
+<section class="slide dark" data-poll="aq1" data-notes="Quebra-gelo de 2 minutos. Os votos chegam dos celulares. Puxe a conversa pelos extremos: quem descobriu na reunião, quanto tempo levou para reconstruir? Quem sobrescreveu, o que teria evitado?">
+  <div class="head"><p class="eyebrow">Aquecimento · vote no celular</p><h2>Alguém já precisou explicar um número do passado <em>e a tabela só tinha o presente?</em></h2></div>
+  <div class="row" style="gap:40px">
+    <div class="grow"><div class="lp" data-lp="aq1"></div></div>
+    <div class="card" style="width:420px;display:flex;flex-direction:column;gap:12px">
+      <p class="eyebrow" style="font-size:13px">Puxe a conversa</p>
+      <p style="font-size:19px">Quem votou na primeira: <b>quanto tempo levou</b> para reconstruir a resposta?</p>
+      <p style="font-size:19px">Quem votou na terceira: <b>o que teria evitado</b>?</p>
+    </div>
+  </div>
+</section>
+
+<!-- 2 · AGENDA -->
+<section class="slide" data-notes="Cinco blocos. Os fundamentos são rápidos. O peso está no mapa de decisão e no case. As perguntas que chegarem pelo celular ficam no painel (tecla P): reserve um momento no fim de cada bloco para as mais curtidas.">
+  <div class="row" style="gap:64px;height:100%">
+    <div class="col" style="width:400px;gap:16px"><p class="eyebrow">Roteiro</p><h2>O que vamos ver</h2><p class="lead" style="font-size:19px">Do conceito ao sistema em produção, com o Bloqueio Global como fio condutor. Cada bloco termina com uma pergunta para a sala.</p></div>
+    <div class="col grow" style="gap:0">
+      <div class="row" style="padding:18px 0;border-top:1px solid var(--line)"><p class="serif" style="font-size:32px;font-weight:700;color:var(--orange-ink);width:64px">01</p><div><h3>Fundamentos</h3><p class="small" style="font-size:17px">A pergunta sobre o passado, tipos de fato e de dimensão, SCD de 0 a 6</p></div></div>
+      <div class="row" style="padding:18px 0;border-top:1px solid var(--line)"><p class="serif" style="font-size:32px;font-weight:700;color:var(--orange-ink);width:64px">02</p><div><h3>Mapa de decisão</h3><p class="small" style="font-size:17px">Cinco perguntas, testadas ao vivo com casos do nosso dia a dia</p></div></div>
+      <div class="row" style="padding:18px 0;border-top:1px solid var(--line)"><p class="serif" style="font-size:32px;font-weight:700;color:var(--orange-ink);width:64px">03</p><div><h3>Case Bloqueio Global</h3><p class="small" style="font-size:17px">A régua que viaja no tempo, o snapshot e o motor que grava só a mudança</p></div></div>
+      <div class="row" style="padding:18px 0;border-top:1px solid var(--line)"><p class="serif" style="font-size:32px;font-weight:700;color:var(--orange-ink);width:64px">04</p><div><h3>SCD2 como padrão</h3><p class="small" style="font-size:17px">Auditabilidade, governança e performance no mesmo desenho</p></div></div>
+      <div class="row" style="padding:18px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)"><p class="serif" style="font-size:32px;font-weight:700;color:var(--orange-ink);width:64px">05</p><div><h3>Mão na massa</h3><p class="small" style="font-size:17px">Votação “qual estratégia?” e checklist de review do chapter</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 3 · PERGUNTA CENTRAL -->
+<section class="slide plum" data-notes="Cada uma das três respostas é legítima; o erro é escolher sem saber qual pergunta o negócio vai fazer. Peça exemplos reais de cada uma antes de avançar." style="justify-content:center">
+  <p class="eyebrow">A pergunta central</p>
+  <h2 style="font-size:58px;max-width:1350px;line-height:1.15">Quando um dado muda na origem, a camada analítica precisa decidir: acumular, sobrescrever ou versionar?</h2>
+  <div class="row">
+    <div class="grow" style="background:var(--plum-dark);border-radius:14px;padding:22px 26px"><h3 style="font-size:28px">Acumular</h3><p style="color:#F5DCE7;font-size:18px">Append-only · eventos imutáveis</p></div>
+    <div class="grow" style="background:var(--plum-dark);border-radius:14px;padding:22px 26px"><h3 style="font-size:28px">Sobrescrever</h3><p style="color:#F5DCE7;font-size:18px">Merge · só o estado atual</p></div>
+    <div class="grow" style="background:var(--plum-dark);border-radius:14px;padding:22px 26px"><h3 style="font-size:28px">Versionar</h3><p style="color:#F5DCE7;font-size:18px">SCD2 · qualquer estado passado</p></div>
+  </div>
+  <div class="ask" style="background:#FBF3F6;color:var(--plum-dark)"><div class="ask-ico">?</div><div><p class="ask-label">Pergunta para a sala</p><p class="ask-hint">Clique ou tecle Q</p><p class="ask-q">No seu domínio, qual das três vocês mais usam hoje? E qual deveriam usar mais?</p></div></div>
+</section>
+
+<!-- 4 · FATOS -->
+<section class="slide" data-notes="Peça para a sala chutar a estratégia de cada tipo antes de virar o cartão. Fatos raramente pedem SCD2: o histórico já está no grão.">
+  <div class="head"><p class="eyebrow">Fundamentos · Fatos</p><h2>Quatro tipos de fato. <em>Qual jeito de escrever cada um pede?</em></h2></div>
+  <div class="row">
+    <div class="flip"><div class="flip-inner"><div class="flip-face flip-front"><div class="bar" style="background:var(--muted)"></div><h3 class="serif" style="font-size:28px">Transacional</h3><p style="font-size:18px">Uma linha por evento, que não muda depois de acontecer.</p><p class="tap">Clique para virar</p></div><div class="flip-face flip-back"><p class="pill" style="background:var(--peach);color:var(--green-ink);align-self:flex-start">Append-only</p><p style="font-size:18px">No case: o motor grava uma linha a cada mudança de decisão.</p></div></div></div>
+    <div class="flip"><div class="flip-inner"><div class="flip-face flip-front"><div class="bar" style="background:var(--green-deep)"></div><h3 class="serif" style="font-size:28px">Snapshot periódico</h3><p style="font-size:18px">Uma foto de cada entidade por período.</p><p class="tap">Clique para virar</p></div><div class="flip-face flip-back"><p class="pill" style="background:var(--peach);color:var(--green-ink);align-self:flex-start">Insert por partição</p><p style="font-size:18px">No case: fact de obrigação consolidada, particionada por data de referência.</p></div></div></div>
+    <div class="flip"><div class="flip-inner"><div class="flip-face flip-front"><div class="bar" style="background:var(--orange)"></div><h3 class="serif" style="font-size:28px">Snapshot acumulado</h3><p style="font-size:18px">Uma linha por processo, atualizada a cada marco.</p><p class="tap">Clique para virar</p></div><div class="flip-face flip-back"><p class="pill" style="background:var(--peach);color:var(--green-ink);align-self:flex-start">Merge</p><p style="font-size:18px">Leitura possível: o ciclo da obrigação, do vencimento à baixa.</p></div></div></div>
+    <div class="flip"><div class="flip-inner"><div class="flip-face flip-front"><div class="bar" style="background:var(--plum)"></div><h3 class="serif" style="font-size:28px">Sem fato (factless)</h3><p style="font-size:18px">Registra que algo vale ou aconteceu, sem medida.</p><p class="tap">Clique para virar</p></div><div class="flip-face flip-back"><p class="pill" style="background:var(--peach);color:var(--green-ink);align-self:flex-start">Append ou merge</p><p style="font-size:18px">Exemplo: habilitação de um cliente a um produto de crédito.</p></div></div></div>
+  </div>
+  <p style="font-size:20px;color:var(--body)">Fatos raramente pedem SCD2: o histórico de uma fato já está no grão. Quem muda de significado são as dimensões.</p>
+  <div class="ask"><div class="ask-ico">?</div><div><p class="ask-label">Pergunta para a sala</p><p class="ask-hint">Clique ou tecle Q</p><p class="ask-q">Alguém já viu SCD2 aplicado numa fato? Qual problema ele estava tentando resolver?</p></div></div>
+</section>
+
+<!-- 5 · DIMENSÕES -->
+<section class="slide" data-notes="Todos os exemplos vêm do Bloqueio Global. O catálogo de motivos é um seed versionado: mudar o significado gera nova sk.">
+  <div class="head"><p class="eyebrow">Fundamentos · Dimensões</p><h2>Seis tipos de dimensão que usamos no dia a dia</h2></div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+    <div class="card"><h3 class="serif" style="font-size:24px">Conformada</h3><p style="font-size:17px">Mesmo significado em todos os fatos e domínios.</p><p class="ex">Cliente por CPF, calendário.</p></div>
+    <div class="card"><h3 class="serif" style="font-size:24px">Role-playing</h3><p style="font-size:17px">A mesma dimensão em papéis diferentes.</p><p class="ex">Calendário como vencimento, baixa e referência.</p></div>
+    <div class="card"><h3 class="serif" style="font-size:24px">Junk</h3><p style="font-size:17px">Agrupa flags e atributos de baixa cardinalidade.</p><p class="ex">Dimensão de detalhe da fact de obrigação.</p></div>
+    <div class="card"><h3 class="serif" style="font-size:24px">Degenerada</h3><p style="font-size:17px">Uma chave que vive na fato, sem tabela própria.</p><p class="ex">Número do título ou da parcela.</p></div>
+    <div class="card"><h3 class="serif" style="font-size:24px">Catálogo versionado</h3><p style="font-size:17px">Domínio fechado, alterado só por pull request.</p><p class="ex">13 motivos de bloqueio; novo significado, nova sk.</p></div>
+    <div class="card" style="background:var(--green-dark);border-color:var(--green-dark);color:#F5F3EE"><h3 class="serif" style="font-size:24px">Versionada (SCD)</h3><p style="font-size:17px">Atributos mudam e o histórico importa.</p><p class="ex" style="color:var(--peach)">Régua específica e default de bloqueio.</p></div>
+  </div>
+  <div class="ask"><div class="ask-ico">?</div><div><p class="ask-label">Pergunta para a sala</p><p class="ask-hint">Clique ou tecle Q</p><p class="ask-q">Qual dimensão do seu domínio muda de significado e hoje é sobrescrita?</p></div></div>
+</section>
+
+<!-- 6 · TIPOS SCD -->
+<section class="slide" data-poll="tipo" data-notes="Deixe a votação rodar uns 40 segundos antes de revelar. O 6 também guarda histórico completo, mas é o 2 com uma coluna de valor atual. Tipo 4: na prática, uma view da vigência aberta resolve boa parte dos casos.">
+  <div class="head"><p class="eyebrow">Fundamentos · vote no celular</p><h2>Qual tipo de SCD responde <em>“o que era verdade em D?”</em></h2></div>
+  <div class="row" style="gap:28px;align-items:flex-start">
+    <div style="width:430px"><div class="lp compact" data-lp="tipo"></div></div>
+    <table class="grow">
+      <tr><th style="width:11%">Tipo</th><th style="width:44%">O que faz</th><th>Histórico</th></tr>
+      <tr><td>0</td><td>Guarda o valor original, nunca muda</td><td>Fixo</td></tr>
+      <tr><td>1</td><td>Sobrescreve com o valor novo</td><td>Nenhum</td></tr>
+      <tr class="tipo2"><td><b>2</b></td><td><b>Nova linha por mudança, com vigência</b></td><td>Completo</td></tr>
+      <tr><td>3</td><td>Coluna com o valor anterior</td><td>Só a versão anterior</td></tr>
+      <tr><td>4</td><td>Tabela do atual + tabela de histórico</td><td>Completo, separado</td></tr>
+      <tr><td>6</td><td>Tipo 2 com coluna de valor atual em cada linha</td><td>Completo</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- 7 · MAPA DE DECISÃO -->
+<section class="slide wash" data-notes="Escolha um caso e deixe a sala responder Sim ou Não em voz alta. A terceira pergunta (o valor muda sozinho com o calendário?) é a que mais evita dor.">
+  <div class="head"><p class="eyebrow">Mapa de decisão · ao vivo</p><h2>Cinco perguntas, na ordem: <em>o primeiro “sim” decide</em></h2></div>
+  <div class="case-chips" id="wkCases"></div>
+  <div class="walker">
+    <div class="steps" id="wkSteps"></div>
+    <div class="col">
+      <div class="result-card" id="wkResult" style="background:#3F4A5A"></div>
+      <div class="row" style="gap:10px">
+        <button class="btn solid" id="wkYes">Sim</button>
+        <button class="btn" id="wkNo">Não</button>
+        <button class="btn orange" id="wkReset" style="margin-left:auto">Recomeçar</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 8 · ANATOMIA -->
+<section class="slide" data-poll="fronteira" data-notes="Exemplo da Ana (C-200). A votação da fronteira abre a discussão sobre a convenção da janela. Hoje temos consultas com início estrito e fim inclusivo, como a da régua. Vale escolher uma e registrar no guia do chapter.">
+  <div class="head"><p class="eyebrow">Anatomia</p><h2>Uma dimensão SCD2 tem quatro peças</h2></div>
+  <div class="row" style="gap:36px">
+    <div class="col grow">
+      <table class="mono" style="font-size:16px">
+        <tr><th>sk</th><th>nk</th><th>plano</th><th>ts_inicio</th><th>ts_fim</th></tr>
+        <tr><td style="color:var(--muted)">101</td><td style="color:var(--muted)">C-200</td><td style="color:var(--muted)">Bronze</td><td style="color:var(--muted)">2026-01-01</td><td style="color:var(--muted)">2026-05-01</td></tr>
+        <tr class="hl"><td>102</td><td>C-200</td><td>Gold</td><td>2026-05-01</td><td>null</td></tr>
+      </table>
+      <div style="display:grid;grid-template-columns:200px 1fr;gap:8px 18px;font-size:17px">
+        <p class="mono" style="color:var(--green-deep);font-weight:500">sk_</p><p>Chave da versão. É o que a fato guarda.</p>
+        <p class="mono" style="color:var(--green-deep);font-weight:500">nk_</p><p>Chave natural, estável entre versões.</p>
+        <p class="mono" style="color:var(--green-deep);font-weight:500">ts_inicio / ts_fim</p><p>Janela da vigência. Fim nulo é a versão aberta.</p>
+        <p class="mono" style="color:var(--green-deep);font-weight:500">hash</p><p>Dos atributos versionados. Mudou, abre versão.</p>
+      </div>
+      <div class="code" style="font-size:15.5px"><span class="k">on</span>  f.nk_cliente = d.nk_cliente
+<span class="k">and</span> f.dt_evento >= d.ts_inicio_vigencia
+<span class="k">and</span> f.dt_evento <  <span class="k">coalesce</span>(d.ts_fim_vigencia, <span class="s">'9999-12-31'</span>)</div>
+    </div>
+    <div class="card" style="width:560px;border-color:var(--orange);display:flex;flex-direction:column;gap:12px">
+      <p class="phone-tag" style="align-self:flex-start">📱 Vote no celular</p>
+      <p style="font-size:20px;font-weight:600">Uma venda em <span class="mono">2026-05-01</span> cai em qual versão?</p>
+      <div class="lp compact" data-lp="fronteira"></div>
+    </div>
+  </div>
+</section>
+
+<!-- 9 · CASE MAPA -->
+<section class="slide" data-notes="SCD2 está onde a pergunta é “o que era verdade em D?”: snapshot e régua. Clique numa linha para destacar enquanto comenta.">
+  <div class="head"><p class="eyebrow">Case · Bloqueio Global</p><h2>Sete componentes, cada um com <em>a estratégia da sua pergunta</em></h2></div>
+  <table>
+    <tr><th style="width:17%">Componente</th><th style="width:36%">Estratégia</th><th>Por quê</th></tr>
+    <tr class="clickable"><td>Staging</td><td>Tipagem, sem regra de negócio</td><td>Fiel à origem, com freshness por risco</td></tr>
+    <tr class="clickable"><td>Intermediate</td><td>Incremental no boleto e no PEP · full refresh no cartão</td><td>No cartão, a conta quitada some da origem</td></tr>
+    <tr class="clickable hl"><td><b>Snapshot</b></td><td><b>SCD2 · strategy check</b></td><td>O que o cliente devia em qualquer dia</td></tr>
+    <tr class="clickable hl"><td><b>Régua</b></td><td><b>SCD2 · dado versionado</b></td><td>Política de crédito reproduzível em qualquer data</td></tr>
+    <tr class="clickable"><td>Motor</td><td>Append-only por hash de estado</td><td>Roda 24 vezes por dia, grava só quando a decisão muda</td></tr>
+    <tr class="clickable"><td>Posição</td><td>Upsert · contrato de 20 campos</td><td>Estado atual, com o porquê da decisão</td></tr>
+    <tr class="clickable"><td>API</td><td>REST + DynamoDB + eventos</td><td>SLA de até 60 minutos</td></tr>
+  </table>
+  <div class="ask"><div class="ask-ico">?</div><div><p class="ask-label">Pergunta para a sala</p><p class="ask-hint">Clique ou tecle Q</p><p class="ask-q">Por que a posição que a API lê é upsert, e não SCD2? Onde o histórico dela mora?</p></div></div>
+</section>
+
+<!-- 10 · RÉGUA -->
+<section class="slide" data-poll="regua" data-notes="Exemplo ilustrativo. Arraste a data e ligue ou desligue a exceção do CPF. A votação no celular (abra a caixa laranja com Q) pergunta se mudar a default amanhã altera a decisão de 15/09.">
+  <div class="head"><p class="eyebrow">Case · Régua de tolerância · simulador</p><h2>A régua viaja no tempo: <em>arraste a data</em></h2></div>
+  <div class="tl" id="tl">
+    <p class="m">Ilustrativo</p><p class="m">Jul</p><p class="m">Ago</p><p class="m">Set</p><p class="m">Out</p>
+    <p class="lab">Default do produto</p>
+    <div class="seg def" data-seg="d1">v1 · 5d · R$ 150</div>
+    <div class="seg def" data-seg="d2" style="grid-column:span 2">v2 · 3d · R$ 100</div>
+    <div class="seg def" data-seg="d3">v3 · 3d · R$ 50</div>
+    <p class="lab">Específica do CPF</p>
+    <div style="grid-column:span 2"></div>
+    <div class="seg spec" data-seg="s1" style="grid-column:span 2">v1 · 10d · R$ 300 · exceção</div>
+    <div id="cursor"><span id="cursorLab">15/09</span></div>
+  </div>
+  <div class="row" style="align-items:center;gap:28px">
+    <input type="range" id="rgDate" min="0" max="122" value="76" style="flex:1;margin-left:218px" aria-label="Data de referência">
+    <label class="toggle"><input type="checkbox" id="rgSpec" checked> Exceção do CPF cadastrada</label>
+  </div>
+  <div class="row" style="gap:20px">
+    <div class="code grow" id="rgSql" style="font-size:15.5px"></div>
+    <div class="card" style="width:470px;background:var(--green-light);border-color:var(--green-light)">
+      <p class="eyebrow" style="font-size:13px;color:var(--green-dark)" id="rgTitle">Régua aplicada</p>
+      <p class="serif" style="font-size:44px;font-weight:700;color:var(--green-dark);line-height:1.1;margin:6px 0" id="rgRule"></p>
+      <p style="font-size:17px" id="rgWhy"></p>
+    </div>
+  </div>
+  <div class="ask"><div class="ask-ico">?</div><div><p class="ask-label">Pergunta para a sala · vote no celular</p><p class="ask-hint">Clique ou tecle Q</p><p class="ask-q">Se o Crédito mudar a régua default amanhã, a decisão de 15/09 muda?</p><div class="ask-body"><div class="lp compact" data-lp="regua"></div></div></div></div>
+</section>
+
+<!-- 11 · SNAPSHOT -->
+<section class="slide" data-notes="Strategy check porque as origens não têm updated_at confiável para todas as mudanças que importam. Deixe a sala responder a pausa antes de revelar.">
+  <div class="head"><p class="eyebrow">Case · Snapshot de obrigações</p><h2>O snapshot lembra <em>o que a origem esquece</em></h2></div>
+  <div class="row" style="gap:36px">
+    <div class="col grow">
+      <p class="lead" style="font-size:19px">Cada intermediate de obrigação ganha um snapshot SCD2 com strategy check: o que o cliente devia em qualquer dia, por produto.</p>
+      <div class="row" style="flex-wrap:wrap;gap:8px">
+        <span class="pill mono" style="background:var(--green-light);color:var(--green-dark)">dc_status_obrigacao_financeira</span>
+        <span class="pill mono" style="background:var(--green-light);color:var(--green-dark)">dt_compensacao</span>
+        <span class="pill mono" style="background:var(--green-light);color:var(--green-dark)">dc_tipo_bloqueio_advertencia</span>
+        <span class="pill mono" style="background:var(--green-light);color:var(--green-dark)">dc_evento_contrato</span>
+        <span class="pill mono" style="background:var(--orange-light);color:var(--orange-ink);border:1.5px dashed var(--orange)">fl_debito_cobravel ?</span>
+      </div>
+      <div class="code"><span class="c">-- ilustrativo</span>
+{% snapshot snp_int_obrigacao_financeira_cartao_intraday %}
+strategy   = <span class="s">'check'</span>
+check_cols = [colunas versionadas]
+<span class="c">-- dias de atraso ficam fora</span></div>
+    </div>
+    <div class="col" style="width:560px">
+      <div class="card" style="border-color:var(--orange);display:flex;flex-direction:column;gap:12px">
+        <p class="eyebrow" style="font-size:13px">Pausa para pensar</p>
+        <p style="font-size:20px;font-weight:600">A decisão filtra débitos cobráveis, mas <span class="mono">fl_debito_cobravel</span> ficou fora do check. O que quebra?</p>
+        <button class="btn orange" data-show="snapAns" style="align-self:flex-start">Revelar</button>
+        <div class="reveal" id="snapAns"><div class="answer-box">O histórico existe, mas não explica a decisão: o snapshot não guardava o filtro que ela usava. Controle permanente: a flag entrou no snapshot. <b>A lista de check_cols é contrato.</b></div></div>
+      </div>
+      <div class="card" style="background:var(--green-light);border-color:var(--green-light)"><h3>O snapshot também gera dado</h3><p style="font-size:17px;margin-top:6px">No cartão, a conta quitada some da origem sem data. A data da baixa vem do snapshot.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 12 · MOTOR -->
+<section class="slide wash" data-notes="Clique em “próxima hora” e peça à sala para prever: grava ou ignora? Depois ligue “versionar a cada execução” e compare.">
+  <div class="head"><p class="eyebrow">Case · Motor de decisão · simulador</p><h2>Roda toda hora, <em>grava só a mudança</em></h2></div>
+  <div class="hours" id="hours"></div>
+  <div class="row" style="align-items:center;gap:14px">
+    <button class="btn solid" id="hrNext">Próxima hora ▸</button>
+    <button class="btn" id="hrAll">Rodar o dia</button>
+    <button class="btn orange" id="hrReset">Recomeçar</button>
+    <label class="toggle" style="margin-left:18px"><input type="checkbox" id="hrNaive"> Versionar a cada execução (anti-padrão)</label>
+    <div class="counter" style="margin-left:auto"><div><b id="cExec">0</b><span>execuções</span></div><div><b id="cRows">0</b><span>linhas gravadas</span></div></div>
+  </div>
+  <div class="row">
+    <div class="card grow" style="background:var(--orange-light);border-color:var(--orange-light)"><p class="eyebrow" style="font-size:13px">Evite</p><h3 style="margin:4px 0">SCD2 na fato horária</h3><p style="font-size:17px">Versionar a cada execução, ou com um campo que muda sozinho, gera microvigências: versões de uma hora que não contam nada.</p></div>
+    <div class="card grow"><p class="eyebrow" style="font-size:13px;color:var(--green-deep)">Faça</p><h3 style="margin:4px 0">Hash do estado de decisão</h3><p style="font-size:17px">Grave só quando o hash difere do último estado. Nulos viram string vazia antes do hash, igual em todas as camadas.</p></div>
+  </div>
+</section>
+
+<!-- 13 · AUDITORIA -->
+<section class="slide" data-notes="Leia a pergunta, deixe a sala propor como responderia, e só então clique para revelar o mecanismo.">
+  <div class="head"><p class="eyebrow">Auditabilidade</p><h2>Com SCD2, auditoria vira consulta. <em>Como vocês responderiam?</em></h2></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div class="card" style="cursor:pointer" data-toggle><p class="serif" style="font-size:24px;font-style:italic">“Por que este cliente foi bloqueado em 05/09?”</p><div class="reveal"><p style="font-size:17px;margin-top:10px">Motivo da decisão + régua vigente no dia + débito no snapshot daquele dia.</p><p class="mono ex">join temporal</p></div><p class="small reveal-hint" style="margin-top:8px">Clique para revelar</p></div>
+    <div class="card" style="cursor:pointer" data-toggle><p class="serif" style="font-size:24px;font-style:italic">“Qual régua valia quando a decisão saiu?”</p><div class="reveal"><p style="font-size:17px;margin-top:10px">A fato guarda as chaves da regra específica e da default vigentes.</p><p class="mono ex">FKs de regra na fato</p></div><p class="small reveal-hint" style="margin-top:8px">Clique para revelar</p></div>
+    <div class="card" style="cursor:pointer" data-toggle><p class="serif" style="font-size:24px;font-style:italic">“Quem mudou a política de crédito, e quando?”</p><div class="reveal"><p style="font-size:17px;margin-top:10px">Cada mudança de prazo ou valor abre uma vigência. Nada é apagado.</p><p class="mono ex">régua SCD2</p></div><p class="small reveal-hint" style="margin-top:8px">Clique para revelar</p></div>
+    <div class="card" style="cursor:pointer" data-toggle><p class="serif" style="font-size:24px;font-style:italic">“A decisão de ontem estava certa?”</p><div class="reveal"><p style="font-size:17px;margin-top:10px">Recalcular a decisão esperada dia a dia e comparar com a real.</p><p class="mono ex">replay esperado × real</p></div><p class="small reveal-hint" style="margin-top:8px">Clique para revelar</p></div>
+  </div>
+  <div class="ask"><div class="ask-ico">?</div><div><p class="ask-label">Pergunta para a sala</p><p class="ask-hint">Clique ou tecle Q</p><p class="ask-q">Qual dessas perguntas o seu domínio não consegue responder hoje?</p></div></div>
+</section>
+
+<!-- 14 · INCIDENTE -->
+<section class="slide" data-poll="vencido" data-notes="Comece pela votação no celular. Revele quando a maioria tiver votado. A estratégia de materialização já era risco mapeado desde julho.">
+  <div class="head"><p class="eyebrow">Governança · Hipercare</p><h2>Setembro: <em>o histórico respondeu em dias</em></h2></div>
+  <div class="row" style="gap:32px">
+    <div class="card" style="width:660px;background:var(--green-dark);border-color:var(--green-dark);color:#F5F3EE;display:flex;flex-direction:column;gap:12px">
+      <p class="phone-tag" style="align-self:flex-start">📱 Vote no celular</p>
+      <p style="font-size:20px">A obrigação vira <b>VENCIDA</b> só porque o dia virou, sem evento na origem. Num incremental, o que acontece?</p>
+      <div class="lp compact dark-lp" data-lp="vencido"></div>
+      <div class="reveal" id="vencidoLesson"><p style="font-size:17px;color:#CDE3DA"><b style="color:var(--peach)">Lição de SCD:</b> estado derivado do relógio se calcula na data de referência. Gravado e versionado, ele congela.</p></div>
+    </div>
+    <div class="col grow" style="gap:18px">
+      <div class="row" style="gap:16px"><p class="serif" style="font-size:30px;font-weight:700;color:var(--orange-ink);width:30px">1</p><div><h3>O que aconteceu?</h3><p style="font-size:17px;color:var(--body)">Causa isolada em um componente, com dono.</p></div></div>
+      <div class="row" style="gap:16px"><p class="serif" style="font-size:30px;font-weight:700;color:var(--orange-ink);width:30px">2</p><div><h3>Quem foi afetado?</h3><p style="font-size:17px;color:var(--body)">Replay dia a dia sobre os snapshots: cada cliente, cada dia.</p></div></div>
+      <div class="row" style="gap:16px"><p class="serif" style="font-size:30px;font-weight:700;color:var(--orange-ink);width:30px">3</p><div><h3>Já está contido?</h3><p style="font-size:17px;color:var(--body)">Recálculo completo diário às 6h, reversível.</p></div></div>
+      <div class="row" style="gap:16px"><p class="serif" style="font-size:30px;font-weight:700;color:var(--orange-ink);width:30px">4</p><div><h3>Pode voltar?</h3><p style="font-size:17px;color:var(--body)">Teste com severidade error e item novo no checklist.</p></div></div>
+    </div>
+  </div>
+  <div class="ask"><div class="ask-ico">?</div><div><p class="ask-label">Pergunta para a sala</p><p class="ask-hint">Clique ou tecle Q</p><p class="ask-q">Sem os snapshots, como vocês responderiam “quem foi afetado?”, e em quanto tempo?</p></div></div>
+</section>
+
+<!-- 15 · PERFORMANCE -->
+<section class="slide wash" data-notes="Próximas economias mapeadas: otimizar os 4 testes de qualidade do SAP, processar os três produtos em paralelo e avaliar cluster dedicado para o cartão. Números de julho.">
+  <div class="head"><p class="eyebrow">Performance</p><h2>Custo proporcional <em>ao que muda</em></h2></div>
+  <div class="row" style="gap:56px">
+    <div><p class="serif" style="font-size:50px;font-weight:700;color:var(--green-dark)">~22 min</p><p class="small">por execução (jul/26)</p></div>
+    <div><p class="serif" style="font-size:50px;font-weight:700;color:var(--green-dark)">24×</p><p class="small">execuções por dia</p></div>
+    <div><p class="serif" style="font-size:50px;font-weight:700;color:var(--green-dark)">≤ 60 min</p><p class="small">SLA da origem ao crédito</p></div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">
+    <div class="card"><h3>Versione o significado</h3><p style="font-size:16px;color:var(--body)">check_cols enxutas; dias de atraso ficam fora.</p></div>
+    <div class="card"><h3>Grave só a mudança</h3><p style="font-size:16px;color:var(--body)">Hash de estado: menos linhas, merges menores.</p></div>
+    <div class="card"><h3>Processe o delta</h3><p style="font-size:16px;color:var(--body)">Watermark de 2 h; catch-up de 7 dias aos sábados.</p></div>
+    <div class="card"><h3>Snapshot ou manual</h3><p style="font-size:16px;color:var(--body)">O snapshot relê a fonte; com volume, Merge + SCD2 lê só o delta.</p></div>
+    <div class="card"><h3>Atual sem varrer</h3><p style="font-size:16px;color:var(--body)">View da vigência aberta para quem só quer o presente.</p></div>
+    <div class="card"><h3>Full refresh com endereço</h3><p style="font-size:16px;color:var(--body)">Só onde a origem esconde a baixa, como no cartão.</p></div>
+  </div>
+  <div class="ask"><div class="ask-ico">?</div><div><p class="ask-label">Pergunta para a sala</p><p class="ask-hint">Clique ou tecle Q</p><p class="ask-q">Onde vocês pagam hoje por versionar algo que não muda o significado?</p></div></div>
+</section>
+
+<!-- 16 · CHECKLIST -->
+<section class="slide" data-notes="Passe pelos itens com a sala e marque os que o time já pratica. Os desmarcados viram pauta.">
+  <div class="head"><p class="eyebrow">Governança · Code review</p><h2>Checklist de review para SCD2: <em>o que já praticamos?</em></h2></div>
+  <div class="row" style="gap:24px">
+    <div class="card grow"><h3 class="serif" style="font-size:26px;color:var(--green-dark);margin-bottom:6px">Modelagem</h3>
+      <label class="check"><input type="checkbox"><span>Chave natural estável e única por nk + início da vigência</span></label>
+      <label class="check"><input type="checkbox"><span>Colunas versionadas listadas e justificadas</span></label>
+      <label class="check"><input type="checkbox"><span>Nada derivado do relógio no versionamento</span></label>
+      <label class="check"><input type="checkbox"><span>Uma convenção de janela no time: [início, fim)</span></label>
+      <label class="check"><input type="checkbox"><span>A fato guarda a sk da versão ou faz join temporal</span></label>
+    </div>
+    <div class="card grow"><h3 class="serif" style="font-size:26px;color:var(--plum);margin-bottom:6px">Engenharia</h3>
+      <label class="check"><input type="checkbox"><span>Hash com nulos normalizados, igual em todas as camadas</span></label>
+      <label class="check"><input type="checkbox"><span>Timestamps sem truncar na hora</span></label>
+      <label class="check"><input type="checkbox"><span>Teste: uma versão aberta por chave, sem sobreposição</span></label>
+      <label class="check"><input type="checkbox"><span>Reexecutar não duplica: idempotência testada</span></label>
+      <label class="check"><input type="checkbox"><span>Freshness por risco na origem do snapshot</span></label>
+    </div>
+  </div>
+  <p style="font-size:18px;color:var(--body)"><b id="chkCount">0 de 10</b> já praticados pelo time · todo defeito que chega ao review vira item desta lista.</p>
+  <div class="ask"><div class="ask-ico">?</div><div><p class="ask-label">Pergunta para a sala</p><p class="ask-hint">Clique ou tecle Q</p><p class="ask-q">Pela experiência de vocês, qual item está faltando nesta lista?</p></div></div>
+</section>
+
+<!-- 17 · DINÂMICA -->
+<section class="slide dark" data-poll="dn" data-notes="Dez minutos (clique no relógio). Para cada caso, a sala vota no celular; peça a alguém de cada lado para defender e só então revele. Avançar de caso aqui muda o caso no celular de todos. As melhores discussões aparecem nos casos 3 e 4.">
+  <div class="row" style="justify-content:space-between;align-items:flex-start">
+    <div class="head"><p class="eyebrow">Dinâmica · vote no celular</p><h2 style="font-size:46px">Qual estratégia?</h2></div>
+    <div class="row" style="align-items:center;gap:14px"><div class="case-dots" id="dnDots"></div><button id="timer" title="Clique para iniciar ou pausar">10:00</button></div>
+  </div>
+  <div class="card" style="padding:28px 32px"><p class="small" id="dnNum">Caso 1 de 6</p><p class="serif" style="font-size:38px;line-height:1.2;margin-top:6px" id="dnCase"></p><p class="small" style="margin-top:8px;font-size:17px" id="dnHint"></p></div>
+  <div class="vote-grid" id="dnVotes"></div>
+  <div class="reveal" id="dnAns"><div class="answer-box" id="dnWhy" style="font-size:19px"></div></div>
+  <div class="row" style="gap:12px;align-items:center">
+    <button class="btn" id="dnPrev">◂ Caso anterior</button>
+    <button class="btn solid" id="dnReveal">Revelar gabarito</button>
+    <button class="btn" id="dnNext">Próximo caso ▸</button>
+    <p class="small" id="dnTotal" style="margin-left:auto"></p>
+  </div>
+</section>
+
+<!-- 18 · ENCERRAMENTO -->
+<section class="slide dark" data-notes="Rodada final: as respostas chegam pelo celular e aparecem no painel (tecla P, aba Rodada final). Leia algumas em voz alta. Depois do meetup, todas ficam guardadas para virar pauta do chapter." style="justify-content:center;background:radial-gradient(circle at 85% 18%, rgba(204,112,69,.25), transparent 45%), var(--green-dark)">
+  <p class="eyebrow">Para levar</p>
+  <h1 style="font-size:78px;font-weight:900;max-width:1200px">Versione o que muda o significado.</h1>
+  <div class="row">
+    <div class="card grow"><h3 style="font-size:24px">Comece pela pergunta</h3><p style="font-size:17px;color:#CDE3DA;margin-top:6px">A resposta que o negócio vai cobrar amanhã escolhe a estratégia.</p></div>
+    <div class="card grow"><h3 style="font-size:24px">SCD2 é contrato</h3><p style="font-size:17px;color:#CDE3DA;margin-top:6px">Chave natural, colunas versionadas e janela de vigência, todas testadas.</p></div>
+    <div class="card grow"><h3 style="font-size:24px">Histórico consultável</h3><p style="font-size:17px;color:#CDE3DA;margin-top:6px">Join temporal, chaves de regra na fato e replay para provar.</p></div>
+  </div>
+  <div class="card" style="background:var(--peach);border-color:var(--peach);color:var(--green-ink);display:flex;gap:18px;align-items:center">
+    <p class="serif" style="font-size:40px;font-weight:700">↺</p>
+    <div class="grow"><p style="font-size:13px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase">Rodada final · responda no celular</p><p class="serif" style="font-size:24px">Qual tabela do seu domínio deveria ser SCD2 e hoje não é, ou o contrário?</p></div>
+    <p class="mono" style="font-size:28px" id="rodadaCount">0</p>
+  </div>
+  <p style="font-size:20px"><b>Perguntas?</b> · Erika Medeiros</p>
+</section>
+
+</div></div>
+
+<div id="hud">
+  <span><span id="hudLive"><i></i><span id="hudLiveTxt">offline</span></span> · <span id="hudLabel"></span></span>
+  <div class="nav">
+    <button id="bQr">QR code (C)</button>
+    <button id="bQa">Perguntas (P) <span id="hudQ"></span></button>
+    <button id="bNotes">Notas (N)</button>
+    <button id="bAud">Ver como plateia</button>
+    <button id="bExport" title="Baixar votos e perguntas em JSON">Exportar</button>
+    <button id="bHelp">?</button>
+    <button id="bPrev" aria-label="Slide anterior">◂</button>
+    <button id="bNext" aria-label="Próximo slide">▸</button>
+  </div>
+</div>
+<div id="notes" hidden></div>
+<div id="help" hidden><b>Atalhos</b><br><kbd>→</kbd> <kbd>espaço</kbd> próximo · <kbd>←</kbd> anterior<br><kbd>Q</kbd> pergunta para a sala · <kbd>P</kbd> painel de perguntas<br><kbd>C</kbd> QR code · <kbd>N</kbd> notas · <kbd>F</kbd> tela cheia</div>
+<div id="qrOverlay" hidden role="dialog" aria-label="QR code do meetup">
+  <div class="qr-box" data-qr></div>
+  <div style="max-width:440px">
+    <h2>Entre pelo celular</h2>
+    <p>Aponte a câmera para o código. Você vota nas perguntas e manda dúvidas ao vivo.</p>
+    <p class="mono" style="margin-top:14px" id="qrUrl"></p>
+    <p style="margin-top:14px;font-size:14px">Clique em qualquer lugar ou tecle C para fechar.</p>
+  </div>
+</div>
+<aside id="qa" hidden>
+  <header><h2>Perguntas da sala</h2><button class="x" id="qaClose" aria-label="Fechar painel">×</button></header>
+  <div class="qa-tabs"><button class="on" data-qtab="pergunta">Perguntas</button><button data-qtab="rodada">Rodada final</button><button data-qtab="respondidas">Respondidas</button></div>
+  <div class="qa-list" id="qaList"></div>
+</aside>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>
